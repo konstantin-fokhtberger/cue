@@ -5,7 +5,7 @@
 | Field | Value |
 |---|---|
 | Product | Personalized cue for macOS |
-| Status | Proposed baseline |
+| Status | Accepted baseline |
 | Primary device | MacBook Air 15-inch, Apple M2 |
 | Primary OS | macOS 26.5.2, build 25F84 |
 | Primary workflow | Meeting copilot |
@@ -36,11 +36,16 @@ Meeting infrastructure is the shared foundation for the interview profile. Codin
 - Zoom, Microsoft Teams, and Google Meet.
 - Multiple remote meeting participants.
 
-### Assumptions requiring confirmation
+### Accepted baseline
 
-- Initial distribution is a personal signed build outside the Mac App Store.
-- Initial architecture may require network calls to a selected STT and LLM provider.
-- Russian and English are likely required, but the language set is not yet accepted.
+- Initial distribution is a signed and notarized personal build outside the Mac App Store.
+- Russian and English are supported, including code-switching inside one session.
+- The target range is 1 to 8 remote speakers.
+- Suggestions are explicitly requested by the user in the first release.
+- Raw audio is not persisted.
+- Transcript data exists only in memory for the active session.
+- OpenAI diarization is the default STT path; cross-provider fallback is disabled.
+- STT and LLM providers are selected independently.
 - Remote speakers may initially be shown as `Speaker A`, `Speaker B`, and so on.
 
 ## 5. Product outcomes
@@ -117,14 +122,13 @@ The meeting MVP is not releasable until:
 6. Security, privacy, signing, and packaging gates pass.
 7. No unresolved P0 or P1 defects remain.
 
-## 10. Open product decisions
+## 10. Product decisions
 
 | ID | Decision | Why it matters |
 |---|---|---|
-| DEC-001 | Supported spoken languages | STT provider, evaluation corpus, prompts, and cost |
-| DEC-002 | Maximum expected number of remote speakers | Diarization configuration and test corpus |
-| DEC-003 | Target suggestion latency | Pipeline and model selection |
-| DEC-004 | Transcript and raw-audio retention policy | Data model, storage, privacy, and recovery |
-| DEC-005 | Default STT and LLM providers | Cost, privacy, quality, latency, and fallback behavior |
-| DEC-006 | Required distribution assurance | Signing, notarization, update channel, and local CI |
-
+| DEC-001 | Accepted | Russian and English with code-switching |
+| DEC-002 | Accepted | 1 to 8 remote speakers |
+| DEC-003 | Accepted | Partial transcript p95 <= 2 seconds; reply first token p95 <= 3 seconds; Stop p95 <= 500 ms |
+| DEC-004 | Accepted | No raw-audio persistence; transcript retained only in active-session memory |
+| DEC-005 | Accepted | OpenAI diarization as default STT; LLM selected independently; no automatic cross-provider fallback |
+| DEC-006 | Accepted | Signed and notarized personal distribution outside the Mac App Store |

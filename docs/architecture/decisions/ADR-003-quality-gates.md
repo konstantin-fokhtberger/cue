@@ -1,6 +1,6 @@
 # ADR-003: combined quality gates
 
-- Status: Proposed
+- Status: Accepted
 - Date: 2026-07-24
 
 ## Context
@@ -37,4 +37,3 @@ Generated files and third-party dependencies are outside project-owned coverage.
 - CI will take longer and may require a self-hosted target-Mac runner.
 - Some low-value glue may need refactoring solely to become deterministic.
 - 100% coverage remains necessary but is not treated as proof that no defects exist.
-

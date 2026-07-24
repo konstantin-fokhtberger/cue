@@ -22,13 +22,13 @@
 
 | ID | Epic | Priority | Status | Deliverable | Dependencies |
 |---|---|---:|---|---|---|
-| DOC-001 | EPIC-001 | P0 | in_progress | Engineering documentation baseline | None |
-| DEC-001 | EPIC-001 | P0 | proposed | Accept languages and code-switching requirements | DOC-001 |
-| DEC-002 | EPIC-001 | P0 | proposed | Accept participant-count target | DOC-001 |
-| DEC-003 | EPIC-001 | P0 | proposed | Accept latency SLOs | DOC-001 |
-| DEC-004 | EPIC-006 | P0 | proposed | Accept retention and recording policy | DOC-001 |
-| DEC-005 | EPIC-006 | P0 | proposed | Select default STT and LLM providers | DOC-001 |
-| TOOL-001 | EPIC-001 | P0 | proposed | Select test, coverage, mutation, lint, and type-check toolchain | DOC-001 |
+| DOC-001 | EPIC-001 | P0 | done | Engineering documentation baseline | None |
+| DEC-001 | EPIC-001 | P0 | done | Accept languages and code-switching requirements | DOC-001 |
+| DEC-002 | EPIC-001 | P0 | done | Accept participant-count target | DOC-001 |
+| DEC-003 | EPIC-001 | P0 | done | Accept latency SLOs | DOC-001 |
+| DEC-004 | EPIC-006 | P0 | done | Accept retention and recording policy | DOC-001 |
+| DEC-005 | EPIC-006 | P0 | done | Select default STT and LLM providers | DOC-001 |
+| TOOL-001 | EPIC-001 | P0 | ready | Select test, coverage, mutation, lint, and type-check toolchain | DOC-001 |
 | CI-001 | EPIC-001 | P0 | proposed | Add pull-request CI with reproducible dependency installation | TOOL-001 |
 | CI-002 | EPIC-001 | P0 | proposed | Add self-hosted target-Mac test lane | CI-001 |
 | SPIKE-AUDIO-001 | EPIC-002 | P0 | proposed | Modern Electron/CoreAudio Tap feasibility spike | TOOL-001 |
@@ -61,4 +61,3 @@ The first implementation package should contain only:
 3. `TEST-AUDIO-001` - adapter contract and deterministic fixture foundation.
 
 Feature work must not begin before the audio feasibility and session-testability gates.
-

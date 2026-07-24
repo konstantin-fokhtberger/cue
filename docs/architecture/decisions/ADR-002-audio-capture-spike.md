@@ -1,6 +1,6 @@
 # ADR-002: validate Electron audio capture before a native helper
 
-- Status: Proposed
+- Status: Accepted
 - Date: 2026-07-24
 
 ## Context
@@ -15,7 +15,7 @@ The repository uses Electron 33 and a loopback configuration that is not a relia
 | Swift ScreenCaptureKit helper | Explicit outputs and lifecycle, richer diagnostics | Native toolchain, IPC, signing, failure recovery, higher TCO |
 | Virtual audio device | Fast workaround | User configuration, route fragility, external dependency |
 
-## Proposed decision
+## Decision
 
 Run a bounded feasibility spike using a supported Electron version. Accept Electron only if the complete application, route, lifecycle, and packaged-build matrix passes. Otherwise adopt a Swift ScreenCaptureKit helper behind the same `SystemAudioCapturePort`.
 
@@ -30,4 +30,3 @@ Run a bounded feasibility spike using a supported Electron version. Accept Elect
 ## Consequences
 
 The spike is not throwaway code. It must use the proposed capture port and produce reusable tests, but it must not trigger the full architecture migration before feasibility is known.
-

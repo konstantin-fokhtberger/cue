@@ -2,7 +2,7 @@
 
 ## 1. Status
 
-This is a proposed target architecture. The Electron audio path must pass the feasibility spike before the capture adapter is accepted.
+This target architecture is accepted. The Electron audio path must still pass the feasibility spike before its concrete capture adapter is accepted.
 
 ## 2. Architecture drivers
 
@@ -173,4 +173,3 @@ Transcript updates are append/correct events. Presentation aliases do not mutate
 - State transitions produce deterministic events.
 - Audio fixtures are synthetic or explicitly consented and contain no secrets.
 - Platform adapters have contract suites shared by fake, Electron, and possible Swift implementations.
-
