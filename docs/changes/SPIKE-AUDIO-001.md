@@ -90,6 +90,7 @@ or introduces a native Swift helper.
 | System-audio permission denied         | System channel reports permission failure    | CT-CAPTURE-SYSTEM-DENIED-001 |
 | Audio track exists but emits no frames | Health state becomes `dead`                  | CT-CAPTURE-DEAD-001          |
 | Stop races with media request          | Late stream is stopped and discarded         | CT-CAPTURE-STOP-RACE-001     |
+| Duplicate async Start                  | One in-flight system capture request         | CT-CAPTURE-SINGLE-FLIGHT-001 |
 | Audio route changes                    | Stream termination or recovery is observable | RT-MAC-ROUTE-001             |
 | Chromium/Electron regression           | Package or fixture test fails                | RT-MAC-ELECTRON-001          |
 
@@ -142,3 +143,6 @@ or introduces a native Swift helper.
 - Mixed system audio does not itself identify 1-8 remote speakers.
 - Bluetooth route, sleep/wake, and meeting-app behavior remain separate matrix dimensions.
 - Four moderate dependency advisories remain; two are in the production dependency graph.
+- Runtime instrumentation found `BUG-AUDIO-001`: one UI Start creates duplicate concurrent
+  system-capture requests because the click handler and `capture:state` handler both call
+  `startSystemAudio()` before `sysStream` is assigned.

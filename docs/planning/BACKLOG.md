@@ -32,6 +32,7 @@
 | CI-001            | EPIC-001 |       P0 | done     | Add pull-request CI with reproducible dependency installation   | TOOL-001                        |
 | CI-002            | EPIC-001 |       P0 | proposed | Add self-hosted target-Mac test lane                            | CI-001                          |
 | SPIKE-AUDIO-001   | EPIC-002 |       P0 | active   | Modern Electron/CoreAudio Tap feasibility spike                 | TOOL-001                        |
+| BUG-AUDIO-001     | EPIC-002 |       P0 | ready    | Prevent duplicate concurrent system-audio start                 | SPIKE-AUDIO-001                 |
 | TEST-AUDIO-001    | EPIC-002 |       P0 | ready    | Capture adapter contract suite and deterministic audio fixtures | TOOL-001                        |
 | TEST-AUDIO-002    | EPIC-002 |       P0 | proposed | Zoom/Teams/Meet target-Mac automation matrix                    | SPIKE-AUDIO-001, CI-002         |
 | ADR-AUDIO-001     | EPIC-002 |       P0 | proposed | Accept Electron adapter or Swift helper based on spike          | SPIKE-AUDIO-001, TEST-AUDIO-002 |
@@ -56,8 +57,8 @@
 
 The next implementation package should contain:
 
-1. `CI-001` - pull-request CI invoking the accepted local quality commands.
-2. `SPIKE-AUDIO-001` - Electron audio feasibility experiment.
+1. `SPIKE-AUDIO-001` - complete Electron PCM and TCC feasibility evidence.
+2. `BUG-AUDIO-001` - add a tested single-flight system-capture start guard.
 3. `TEST-AUDIO-001` - capture adapter contract and deterministic fixture foundation.
 
 Feature work must not begin before the audio feasibility and session-testability gates.

@@ -98,6 +98,21 @@ required?
 - The model has 100% structural coverage, 500 property-based generated cases, and 51/51 killed
   mutants.
 
+### 2026-07-24 - packaged runtime probe
+
+- Attached Chromium runtime instrumentation to the packaged Electron 43 renderer without
+  changing production capture code.
+- One Start gesture created three AudioWorklet nodes; the intended topology is one microphone
+  node and one system-audio node.
+- Root cause: the click handler calls `startSystemAudio()` directly and the subsequent
+  `capture:state` event calls it again. `sysStream` is assigned only after the asynchronous
+  media request completes, so the current guard does not prevent duplicate in-flight starts.
+- Recorded as `BUG-AUDIO-001`; it remains open and requires a single-flight regression test
+  before implementation.
+- A synthesized spoken fixture produced zero observed messages in all three instrumented
+  worklets. This is not yet attributed to Electron because TCC permission state was not
+  confirmed and the runtime interception itself is spike instrumentation.
+
 ## Preliminary conclusion
 
 No architecture decision yet. The inherited Electron 33 path is rejected as evidence. Electron
