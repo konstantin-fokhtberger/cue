@@ -146,6 +146,16 @@ required?
 - Instrumentation retained labels and aggregate counters only; no raw audio was persisted or
   transmitted.
 
+### 2026-07-24 - shared browser capture adapter regression
+
+- Extracted microphone and system Web Audio lifecycle into one injected browser PCM adapter.
+- Both channels now share duplicate-Start coalescing, generation cancellation, typed
+  permission errors, no-track handling, and partial-start cleanup.
+- Nine deterministic contract tests cover the adapter without Electron or macOS globals.
+- Full gates pass locally with 46 tests, 100% structural coverage, and 268/268 killed mutants.
+- Two packaged Bluetooth/video cycles after extraction retained separate `.Sony (Bluetooth)`
+  and `System audio` tracks. All four contexts closed and both post-Stop deltas were `[0, 0]`.
+
 ## Preliminary conclusion
 
 No architecture decision yet. The inherited Electron 33 path is rejected as evidence. Electron

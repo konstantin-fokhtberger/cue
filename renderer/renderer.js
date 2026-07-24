@@ -1,4 +1,4 @@
-import { AsyncResourceSlot } from '../src/core/async-resource-slot.mjs';
+import { BrowserPcmCapture } from '../src/core/browser-pcm-capture.mjs';
 
 /* cue renderer — UI state, mic capture, IPC, streaming render. */
 (function () {
@@ -181,84 +181,55 @@ import { AsyncResourceSlot } from '../src/core/async-resource-slot.mjs';
     cue.captureToggle();
   });
 
-  // ---- capture: mic (renderer side) --------------------------------------
-  let audioCtx = null, micStream = null, micNode = null, micProc = null;
-  async function startMic() {
-    if (micStream) return;
-    try {
-      micStream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true, channelCount: 1 } });
-      audioCtx = new AudioContext({ sampleRate: 16000 });
-      await audioCtx.audioWorklet.addModule('./pcm-processor.js');
-      micNode = audioCtx.createMediaStreamSource(micStream);
-      micProc = new AudioWorkletNode(audioCtx, 'pcm-processor');
-      micProc.port.onmessage = (e) => cue.micPcm(e.data);
-      const sink = audioCtx.createGain(); sink.gain.value = 0; // run processor silently
-      micNode.connect(micProc); micProc.connect(sink); sink.connect(audioCtx.destination);
-    } catch (err) {
-      cue.log('mic error: ' + (err && err.message));
-    }
-  }
-  function stopMic() {
-    if (micProc) { micProc.port.onmessage = null; micProc.disconnect(); micProc = null; }
-    if (micNode) { micNode.disconnect(); micNode = null; }
-    if (audioCtx) { audioCtx.close(); audioCtx = null; }
-    if (micStream) { micStream.getTracks().forEach((t) => t.stop()); micStream = null; }
-  }
+  // ---- capture: microphone and system audio ------------------------------
+  const browserAudioDependencies = {
+    createAudioContext: () => new AudioContext({ sampleRate: 16000 }),
+    createMediaStream: (tracks) => new MediaStream(tracks),
+    createWorkletNode: (context, name) => new AudioWorkletNode(context, name),
+    processorModuleUrl: './pcm-processor.js',
+    processorName: 'pcm-processor',
+  };
 
-  // ---- capture: system/meeting audio (getDisplayMedia loopback, in cue's process) ----
-  async function disposeSystemAudio({ stream, context, node, processor }) {
-    if (processor) {
-      processor.port.onmessage = null;
-      processor.disconnect();
-    }
-    if (node) node.disconnect();
-    if (context) await context.close();
-    if (stream) stream.getTracks().forEach((track) => track.stop());
-  }
+  const microphoneCapture = new BrowserPcmCapture({
+    ...browserAudioDependencies,
+    channel: 'microphone',
+    openStream: () => navigator.mediaDevices.getUserMedia({
+      audio: { echoCancellation: true, noiseSuppression: true, channelCount: 1 },
+    }),
+    onStarted: () => cue.log('microphone audio: capturing'),
+    onPcm: (pcm) => cue.micPcm(pcm),
+  });
 
-  const systemAudioSlot = new AsyncResourceSlot(disposeSystemAudio);
+  const systemAudioCapture = new BrowserPcmCapture({
+    ...browserAudioDependencies,
+    channel: 'system',
+    openStream: async () => {
+      const stream = await navigator.mediaDevices.getDisplayMedia({ video: true, audio: true });
+      stream.getVideoTracks().forEach((track) => {
+        stream.removeTrack(track);
+        track.stop();
+      });
+      return stream;
+    },
+    onStarted: () => cue.log('system audio: capturing loopback'),
+    onPcm: (pcm) => cue.systemPcm(pcm),
+  });
 
-  async function startSystemAudio() {
-    return systemAudioSlot
-      .start(async () => {
-        const resource = { stream: null, context: null, node: null, processor: null };
-        try {
-          resource.stream = await navigator.mediaDevices.getDisplayMedia({
-            video: true,
-            audio: true,
-          });
-          resource.stream.getVideoTracks().forEach((track) => track.stop());
-          const tracks = resource.stream.getAudioTracks();
-          if (!tracks.length) {
-            throw new Error('no loopback track (macOS loopback unsupported here)');
-          }
-
-          resource.context = new AudioContext({ sampleRate: 16000 });
-          await resource.context.audioWorklet.addModule('./pcm-processor.js');
-          resource.node = resource.context.createMediaStreamSource(new MediaStream(tracks));
-          resource.processor = new AudioWorkletNode(resource.context, 'pcm-processor');
-          resource.processor.port.onmessage = (event) => cue.systemPcm(event.data);
-          const sink = resource.context.createGain();
-          sink.gain.value = 0;
-          resource.node.connect(resource.processor);
-          resource.processor.connect(sink);
-          sink.connect(resource.context.destination);
-          cue.log('system audio: capturing loopback');
-          return resource;
-        } catch (error) {
-          await disposeSystemAudio(resource);
-          cue.log('system audio error: ' + (error && error.message));
-          throw error;
-        }
-      })
-      .catch(() => null);
+  function startCapture(capture, label) {
+    return capture.start().catch((error) => {
+      cue.log(label + ' audio error: ' + (error && error.message));
+      return null;
+    });
   }
 
-  function stopSystemAudio() {
-    systemAudioSlot
-      .stop()
-      .catch((error) => cue.log('system audio stop error: ' + (error && error.message)));
+  function stopCapture(capture, label) {
+    capture.stop().catch((error) => cue.log(label + ' audio stop error: ' + (error && error.message)));
   }
+
+  function startMic() { return startCapture(microphoneCapture, 'microphone'); }
+  function stopMic() { stopCapture(microphoneCapture, 'microphone'); }
+  function startSystemAudio() { return startCapture(systemAudioCapture, 'system'); }
+  function stopSystemAudio() { stopCapture(systemAudioCapture, 'system'); }
 
   // ---- events from main --------------------------------------------------
   cue.on('capture:state', ({ active }) => {

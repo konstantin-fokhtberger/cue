@@ -126,5 +126,6 @@ in-flight generation and disposes a resource that completes after cancellation.
 
 ## Residual risks and follow-up
 
-- Microphone Start/Stop races are not addressed by this bounded fix.
-- Renderer integration remains legacy code until `TEST-AUDIO-001` extracts the full adapter.
+- `TEST-AUDIO-001` subsequently extracted a shared generation-safe adapter for microphone and
+  system capture and added deterministic browser-media contract tests.
+- Bounded buffering, main IPC validation, and the 100-cycle stress gate remain open.
