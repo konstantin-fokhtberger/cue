@@ -1,3 +1,5 @@
+import { AsyncResourceSlot } from '../src/core/async-resource-slot.mjs';
+
 /* cue renderer — UI state, mic capture, IPC, streaming render. */
 (function () {
   const { icon } = window.ICONS;
@@ -204,32 +206,58 @@
   }
 
   // ---- capture: system/meeting audio (getDisplayMedia loopback, in cue's process) ----
-  let sysStream = null, sysCtx = null, sysNode = null, sysProc = null;
-  async function startSystemAudio() {
-    if (sysStream) return;
-    try {
-      const stream = await navigator.mediaDevices.getDisplayMedia({ video: true, audio: true });
-      stream.getVideoTracks().forEach((t) => t.stop()); // we only want the audio
-      const tracks = stream.getAudioTracks();
-      if (!tracks.length) { cue.log('system audio: no loopback track (macOS loopback unsupported here)'); stream.getTracks().forEach((t) => t.stop()); return; }
-      sysStream = stream;
-      sysCtx = new AudioContext({ sampleRate: 16000 });
-      await sysCtx.audioWorklet.addModule('./pcm-processor.js');
-      sysNode = sysCtx.createMediaStreamSource(new MediaStream(tracks));
-      sysProc = new AudioWorkletNode(sysCtx, 'pcm-processor');
-      sysProc.port.onmessage = (e) => cue.systemPcm(e.data);
-      const sink = sysCtx.createGain(); sink.gain.value = 0;
-      sysNode.connect(sysProc); sysProc.connect(sink); sink.connect(sysCtx.destination);
-      cue.log('system audio: capturing loopback');
-    } catch (err) {
-      cue.log('system audio error: ' + (err && err.message));
+  async function disposeSystemAudio({ stream, context, node, processor }) {
+    if (processor) {
+      processor.port.onmessage = null;
+      processor.disconnect();
     }
+    if (node) node.disconnect();
+    if (context) await context.close();
+    if (stream) stream.getTracks().forEach((track) => track.stop());
   }
+
+  const systemAudioSlot = new AsyncResourceSlot(disposeSystemAudio);
+
+  async function startSystemAudio() {
+    return systemAudioSlot
+      .start(async () => {
+        const resource = { stream: null, context: null, node: null, processor: null };
+        try {
+          resource.stream = await navigator.mediaDevices.getDisplayMedia({
+            video: true,
+            audio: true,
+          });
+          resource.stream.getVideoTracks().forEach((track) => track.stop());
+          const tracks = resource.stream.getAudioTracks();
+          if (!tracks.length) {
+            throw new Error('no loopback track (macOS loopback unsupported here)');
+          }
+
+          resource.context = new AudioContext({ sampleRate: 16000 });
+          await resource.context.audioWorklet.addModule('./pcm-processor.js');
+          resource.node = resource.context.createMediaStreamSource(new MediaStream(tracks));
+          resource.processor = new AudioWorkletNode(resource.context, 'pcm-processor');
+          resource.processor.port.onmessage = (event) => cue.systemPcm(event.data);
+          const sink = resource.context.createGain();
+          sink.gain.value = 0;
+          resource.node.connect(resource.processor);
+          resource.processor.connect(sink);
+          sink.connect(resource.context.destination);
+          cue.log('system audio: capturing loopback');
+          return resource;
+        } catch (error) {
+          await disposeSystemAudio(resource);
+          cue.log('system audio error: ' + (error && error.message));
+          throw error;
+        }
+      })
+      .catch(() => null);
+  }
+
   function stopSystemAudio() {
-    if (sysProc) { sysProc.port.onmessage = null; sysProc.disconnect(); sysProc = null; }
-    if (sysNode) { sysNode.disconnect(); sysNode = null; }
-    if (sysCtx) { sysCtx.close(); sysCtx = null; }
-    if (sysStream) { sysStream.getTracks().forEach((t) => t.stop()); sysStream = null; }
+    systemAudioSlot
+      .stop()
+      .catch((error) => cue.log('system audio stop error: ' + (error && error.message)));
   }
 
   // ---- events from main --------------------------------------------------

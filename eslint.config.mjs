@@ -44,10 +44,21 @@ export default [
     },
   },
   {
-    files: ['renderer/{icons,renderer}.js'],
+    files: ['renderer/icons.js'],
     languageOptions: {
       ecmaVersion: 'latest',
       sourceType: 'script',
+      globals: {
+        ...globals.browser,
+      },
+    },
+    rules: commonRules,
+  },
+  {
+    files: ['renderer/renderer.js'],
+    languageOptions: {
+      ecmaVersion: 'latest',
+      sourceType: 'module',
       globals: {
         ...globals.browser,
       },

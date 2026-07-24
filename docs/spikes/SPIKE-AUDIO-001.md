@@ -55,7 +55,7 @@ required?
 | Local quality and package        | Green gates, arm64 `.app`                     | passed                     |
 | Packaged launch                  | Stable process and bundle metadata            | passed                     |
 | Microphone-only fixture          | Nonzero mic frames, zero system contamination | pending                    |
-| System playback fixture          | Nonzero system frames and energy              | pending                    |
+| System playback fixture          | Nonzero system frames and energy              | passed                     |
 | Silence/dead stream              | Explicit `dead` state                         | pending                    |
 | Ten Start/Stop cycles            | No late frames or leaked tracks               | pending                    |
 | Permission denied                | Explicit channel-specific failure             | pending                    |
@@ -107,14 +107,30 @@ required?
 - Root cause: the click handler calls `startSystemAudio()` directly and the subsequent
   `capture:state` event calls it again. `sysStream` is assigned only after the asynchronous
   media request completes, so the current guard does not prevent duplicate in-flight starts.
-- Recorded as `BUG-AUDIO-001`; it remains open and requires a single-flight regression test
-  before implementation.
-- A synthesized spoken fixture produced zero observed messages in all three instrumented
-  worklets. This is not yet attributed to Electron because TCC permission state was not
-  confirmed and the runtime interception itself is spike instrumentation.
+- Recorded as `BUG-AUDIO-001`.
+- After TCC permissions were granted, the original implementation produced separate,
+  nonzero microphone and system PCM. Stop closed the microphone and only one of the two system
+  contexts; the orphan accepted 2125 additional messages during a post-Stop fixture.
+
+### 2026-07-24 - BUG-AUDIO-001 packaged regression
+
+- Added a generation-aware single-flight resource slot and integrated the complete system
+  resource lifecycle: stream, context, source node, and processor.
+- Six focused tests cover concurrent Start, active Stop, Stop-during-Start, cross-generation
+  ordering, active reuse, and creation retry.
+- Full quality gates pass with 37 tests, 100% statements/branches/functions/lines, and 213/213
+  killed mutants.
+- One packaged Start created exactly two AudioWorklet nodes, not three. Before Stop both
+  received 828 messages and 105984 PCM16 samples.
+- The ambient channel measured RMS 156 with peak 1717. The synthesized system fixture channel
+  measured RMS 3906 with peak 32767.
+- Stop closed both AudioContexts. A second synthesized system fixture produced message deltas
+  `[0, 0]`.
+- The probe retained aggregate counters only; it did not persist or transmit raw audio.
 
 ## Preliminary conclusion
 
 No architecture decision yet. The inherited Electron 33 path is rejected as evidence. Electron
-43.2.0 passes dependency, quality, package, and launch gates. The next experiment must observe
-actual microphone and system PCM health after the required user gesture and TCC permissions.
+43.2.0 passes dependency, quality, package, launch, separate live PCM, and single-cycle Stop
+gates. The next experiments must cover microphone isolation, dead-stream detection, repeated
+Start/Stop, permission denial, output routes, and target meeting applications.

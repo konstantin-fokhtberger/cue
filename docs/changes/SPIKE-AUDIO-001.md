@@ -128,11 +128,13 @@ or introduces a native Swift helper.
 ## Verification evidence
 
 - CI: pending.
-- Coverage: 31 tests pass with 100% statements, branches, functions, and lines for the
+- Coverage: 37 tests pass with 100% statements, branches, functions, and lines for the
   currently enforced scope.
-- Mutation: 184/184 mutants killed; mutation score 100%.
+- Mutation: 213/213 mutants killed; mutation score 100%.
 - Performance: pending.
-- Real device: packaged Electron 43.2.0 app launches on the target M2; capture pending.
+- Real device: packaged Electron 43.2.0 captures separate microphone and system PCM on the
+  target M2. `BUG-AUDIO-001` regression creates exactly two worklets and closes both with zero
+  post-Stop messages.
 - Package: Electron 43.2.0 and electron-builder 26.15.3 produce an arm64 app containing the
   expected bundle identifier and audio-capture usage description.
 
@@ -143,6 +145,6 @@ or introduces a native Swift helper.
 - Mixed system audio does not itself identify 1-8 remote speakers.
 - Bluetooth route, sleep/wake, and meeting-app behavior remain separate matrix dimensions.
 - Four moderate dependency advisories remain; two are in the production dependency graph.
-- Runtime instrumentation found `BUG-AUDIO-001`: one UI Start creates duplicate concurrent
-  system-capture requests because the click handler and `capture:state` handler both call
-  `startSystemAudio()` before `sysStream` is assigned.
+- Runtime instrumentation found and verified the fix for `BUG-AUDIO-001`: duplicate
+  concurrent system-capture requests are coalesced by a generation-aware resource slot, and
+  Stop disposes both live channels.
