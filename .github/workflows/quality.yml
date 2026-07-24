@@ -5,7 +5,6 @@ on:
   push:
     branches:
       - main
-      - 'ci/**'
 
 permissions:
   contents: read
@@ -33,7 +32,19 @@ jobs:
           cache-dependency-path: package-lock.json
 
       - name: Install locked dependencies
-        run: npm ci
+        shell: bash
+        run: |
+          for attempt in 1 2 3; do
+            if npm ci; then
+              exit 0
+            fi
+            if [ "$attempt" -eq 3 ]; then
+              exit 1
+            fi
+            delay_seconds=$((attempt * 10))
+            echo "Dependency installation failed; retrying in ${delay_seconds}s."
+            sleep "$delay_seconds"
+          done
 
       - name: Run full quality gate
         run: npm run quality:full
@@ -60,7 +71,19 @@ jobs:
         run: test "$(uname -m)" = "arm64"
 
       - name: Install locked dependencies
-        run: npm ci
+        shell: bash
+        run: |
+          for attempt in 1 2 3; do
+            if npm ci; then
+              exit 0
+            fi
+            if [ "$attempt" -eq 3 ]; then
+              exit 1
+            fi
+            delay_seconds=$((attempt * 10))
+            echo "Dependency installation failed; retrying in ${delay_seconds}s."
+            sleep "$delay_seconds"
+          done
 
       - name: Package unsigned macOS application
         run: npm run pack
