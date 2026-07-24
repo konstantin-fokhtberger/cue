@@ -61,8 +61,8 @@
 
 | Requirement  | Change           | Executable evidence                                  | Status                                                                                             |
 | ------------ | ---------------- | ---------------------------------------------------- | -------------------------------------------------------------------------------------------------- |
-| NFR-TEST-001 | TOOL-001, CI-001 | `npm run test:coverage`, CI-COVERAGE-001             | verified locally for the enforced scope; CI run pending                                            |
-| NFR-TEST-002 | TOOL-001, CI-001 | `npm run test:mutation`, CI-MUTATION-001             | verified locally for enforced modules; CI run pending                                              |
+| NFR-TEST-001 | TOOL-001, CI-001 | `npm run test:coverage`, CI-COVERAGE-001             | verified in GitHub Actions for the enforced scope                                                  |
+| NFR-TEST-002 | TOOL-001, CI-001 | `npm run test:mutation`, CI-MUTATION-001             | verified in GitHub Actions for enforced modules                                                    |
 | NFR-TEST-003 | CI-001           | `npm run validate:traceability`, CI-TRACEABILITY-001 | structural matrix validation implemented; requirement-wide executable evidence remains incremental |
 
 ## Test ID prefixes
