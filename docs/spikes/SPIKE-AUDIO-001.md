@@ -61,6 +61,7 @@ required?
 | Permission denied                | Explicit channel-specific failure             | pending                    |
 | Built-in output                  | Healthy system stream                         | pending                    |
 | Bluetooth output                 | Route result recorded                         | passed                     |
+| USB mic + Bluetooth output       | Separate live PCM and lifecycle               | passed                     |
 | Zoom/Teams/Meet                  | Separate target-app matrix                    | deferred to TEST-AUDIO-002 |
 
 ## Evidence log
@@ -160,10 +161,27 @@ required?
 - A packaged cycle after bounded-buffer integration delivered 187 frames per channel and
   retained zero post-Stop messages.
 
+### 2026-07-24 - USB microphone with Bluetooth output
+
+- `system_profiler SPAudioDataType` reported HyperX SoloCast as the default USB input at
+  48 kHz and `.Sony` as the default Bluetooth output at 44.1 kHz.
+- A browser video supplied continuous system audio while the user supplied live
+  speech/tapping through the USB microphone. No synthetic audio was injected.
+- The microphone track `Default - HyperX SoloCast (03f0:0592)` delivered 1427 messages,
+  182656 samples, RMS `4726`, and peak `32768`.
+- The `System audio` track delivered 1427 messages, 182656 samples, RMS `2368`, and peak
+  `31642`.
+- The 12-bucket RMS correlation between channels was `-0.501`, which rejects simple channel
+  duplication for this observation but is not a complete acoustic-crosstalk certification.
+- Both AudioContexts reached `closed`; post-Stop message deltas were `[0, 0]`.
+- Instrumentation retained labels and aggregate counters only; no raw audio was persisted or
+  transmitted.
+
 ## Preliminary conclusion
 
 No architecture decision yet. The inherited Electron 33 path is rejected as evidence. Electron
 43.2.0 passes dependency, quality, package, launch, separate live PCM, and single-cycle Stop
-gates. Bluetooth playback and ten sequential Start/Stop cycles also pass. The next experiments
-must cover deterministic microphone isolation, dead-stream detection, permission denial,
-built-in output, route switching, and target meeting applications.
+gates. Bluetooth playback, ten sequential Start/Stop cycles, and the HyperX SoloCast USB
+input with Sony Bluetooth output route also pass. The next experiments must cover
+deterministic microphone isolation, dead-stream detection, permission denial, built-in
+output, route switching, and the full target meeting-application matrix.

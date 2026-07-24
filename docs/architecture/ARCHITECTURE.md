@@ -93,7 +93,7 @@ Introduce a signed Swift helper using ScreenCaptureKit only if the preferred pat
 The capture adapter is accepted only after:
 
 - Zoom, Teams, and Meet pass;
-- built-in and Bluetooth routes pass;
+- built-in, Bluetooth-headset, and USB-microphone/Bluetooth-output routes pass;
 - dead-stream detection passes;
 - 100 repeated Start/Stop cycles pass;
 - sleep/wake and route-change behavior is characterized;

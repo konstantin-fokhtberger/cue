@@ -42,6 +42,8 @@ Meeting infrastructure is the shared foundation for the interview profile. Codin
 - Russian and English are supported, including code-switching inside one session.
 - The target range is 1 to 8 remote speakers.
 - Suggestions are explicitly requested by the user in the first release.
+- A regular target route is a separate USB microphone with Bluetooth headphones; the
+  currently accepted devices are HyperX SoloCast input and Sony Bluetooth output.
 - Raw audio is not persisted.
 - Transcript data exists only in memory for the active session.
 - OpenAI diarization is the default STT path; cross-provider fallback is disabled.

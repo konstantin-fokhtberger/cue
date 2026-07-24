@@ -23,14 +23,15 @@
 
 ### Audio capture
 
-| ID           | Priority | Status   | Requirement                                                         | Acceptance criteria                                                                                 |
-| ------------ | -------: | -------- | ------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------- |
-| FR-AUDIO-001 |       P0 | accepted | Capture the user's microphone as a dedicated channel                | Frames are tagged `microphone` and never merged before transcription policy applies                 |
-| FR-AUDIO-002 |       P0 | accepted | Capture meeting/system audio as a dedicated channel                 | Remote audio is captured from Zoom, Teams, and Meet on the target Mac                               |
-| FR-AUDIO-003 |       P0 | accepted | Exclude cue's own generated audio where supported                   | Test playback from cue does not re-enter the remote transcript path                                 |
-| FR-AUDIO-004 |       P0 | accepted | Detect a dead or silent system stream                               | Health check transitions the session to degraded/error state instead of showing false active status |
-| FR-AUDIO-005 |       P1 | accepted | Audio buffers are bounded                                           | Backpressure and overflow behavior are deterministic and tested                                     |
-| FR-AUDIO-006 |       P1 | accepted | Bluetooth and built-in audio routes are supported on the target Mac | The accepted device matrix passes                                                                   |
+| ID           | Priority | Status   | Requirement                                                         | Acceptance criteria                                                                                                            |
+| ------------ | -------: | -------- | ------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------ |
+| FR-AUDIO-001 |       P0 | accepted | Capture the user's microphone as a dedicated channel                | Frames are tagged `microphone` and never merged before transcription policy applies                                            |
+| FR-AUDIO-002 |       P0 | accepted | Capture meeting/system audio as a dedicated channel                 | Remote audio is captured from Zoom, Teams, and Meet on the target Mac                                                          |
+| FR-AUDIO-003 |       P0 | accepted | Exclude cue's own generated audio where supported                   | Test playback from cue does not re-enter the remote transcript path                                                            |
+| FR-AUDIO-004 |       P0 | accepted | Detect a dead or silent system stream                               | Health check transitions the session to degraded/error state instead of showing false active status                            |
+| FR-AUDIO-005 |       P1 | accepted | Audio buffers are bounded                                           | Backpressure and overflow behavior are deterministic and tested                                                                |
+| FR-AUDIO-006 |       P1 | accepted | Bluetooth and built-in audio routes are supported on the target Mac | The accepted device matrix passes                                                                                              |
+| FR-AUDIO-007 |       P1 | accepted | A separate USB microphone works with Bluetooth output               | HyperX SoloCast input and Sony Bluetooth output retain separate microphone/system PCM and pass the accepted meeting-app matrix |
 
 ### Transcription and diarization
 
@@ -95,14 +96,17 @@
 
 The first audio feasibility gate must cover:
 
-| Meeting app     | Output route          |   Participants | Required evidence                             |
-| --------------- | --------------------- | -------------: | --------------------------------------------- |
-| Zoom            | Built-in speakers/mic | 2 and multiple | Separate mic/system capture, transcript, Stop |
-| Zoom            | Bluetooth headset     | 2 and multiple | Route stability and recovery                  |
-| Microsoft Teams | Built-in speakers/mic | 2 and multiple | Separate mic/system capture, transcript, Stop |
-| Microsoft Teams | Bluetooth headset     | 2 and multiple | Route stability and recovery                  |
-| Google Meet     | Built-in speakers/mic | 2 and multiple | Separate mic/system capture, transcript, Stop |
-| Google Meet     | Bluetooth headset     | 2 and multiple | Route stability and recovery                  |
+| Meeting app     | Output route               |   Participants | Required evidence                             |
+| --------------- | -------------------------- | -------------: | --------------------------------------------- |
+| Zoom            | Built-in speakers/mic      | 2 and multiple | Separate mic/system capture, transcript, Stop |
+| Zoom            | Bluetooth headset          | 2 and multiple | Route stability and recovery                  |
+| Zoom            | USB mic + Bluetooth output | 2 and multiple | Separate channels, route stability, Stop      |
+| Microsoft Teams | Built-in speakers/mic      | 2 and multiple | Separate mic/system capture, transcript, Stop |
+| Microsoft Teams | Bluetooth headset          | 2 and multiple | Route stability and recovery                  |
+| Microsoft Teams | USB mic + Bluetooth output | 2 and multiple | Separate channels, route stability, Stop      |
+| Google Meet     | Built-in speakers/mic      | 2 and multiple | Separate mic/system capture, transcript, Stop |
+| Google Meet     | Bluetooth headset          | 2 and multiple | Route stability and recovery                  |
+| Google Meet     | USB mic + Bluetooth output | 2 and multiple | Separate channels, route stability, Stop      |
 
 ## 5. Deferred refinements
 

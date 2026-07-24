@@ -22,6 +22,7 @@
 | FR-AUDIO-004   | SPIKE-AUDIO-001                  | UT-CAPTURE-HEALTH-001, CT-CAPTURE-HEALTH-001, RT-MAC-DEAD-001 | planned |
 | FR-AUDIO-005   | TEST-AUDIO-001                   | PT-AUDIO-BOUNDS-001, MT-AUDIO-001                             | planned |
 | FR-AUDIO-006   | TEST-AUDIO-002                   | RT-MAC-ROUTES-001                                             | planned |
+| FR-AUDIO-007   | SPIKE-AUDIO-001, TEST-AUDIO-002  | RT-MAC-USB-BT-001, RT-MAC-APPS-USB-BT-001                     | planned |
 | FR-STT-001     | STT-001                          | CT-STT-CHANNELS-001                                           | planned |
 | FR-STT-002     | STT-001                          | AT-STT-YOU-001                                                | planned |
 | FR-STT-003     | STT-002                          | AT-DIARIZATION-001, EVAL-DIARIZATION-001                      | planned |
@@ -59,17 +60,18 @@
 
 ## Implemented quality controls
 
-| Requirement    | Change                        | Executable evidence                                  | Status                                                                                                    |
-| -------------- | ----------------------------- | ---------------------------------------------------- | --------------------------------------------------------------------------------------------------------- |
-| NFR-TEST-001   | TOOL-001, CI-001              | `npm run test:coverage`, CI-COVERAGE-001             | verified in GitHub Actions for the enforced scope                                                         |
-| NFR-TEST-002   | TOOL-001, CI-001              | `npm run test:mutation`, CI-MUTATION-001             | verified in GitHub Actions for enforced modules                                                           |
-| NFR-TEST-003   | CI-001                        | `npm run validate:traceability`, CI-TRACEABILITY-001 | structural matrix validation implemented; requirement-wide executable evidence remains incremental        |
-| FR-AUDIO-004   | SPIKE-AUDIO-001               | UT-CAPTURE-HEALTH-001                                | PCM health classification verified; platform dead-stream evidence remains open                            |
-| FR-AUDIO-001   | TEST-AUDIO-001                | CT-CAPTURE-CHANNELS-001, RT-MAC-MIC-001              | adapter channel isolation and packaged microphone/system routing verified; main IPC boundary remains open |
-| FR-AUDIO-005   | TEST-AUDIO-001                | PT-AUDIO-BOUNDS-001, MT-AUDIO-001                    | 60-second per-channel bound matches the newest-byte model across 500 generated sequences                  |
-| FR-SESSION-002 | BUG-AUDIO-001, TEST-AUDIO-001 | CT-CAPTURE-DOUBLE-START-001                          | duplicate Start coalescing verified for microphone and system adapters                                    |
-| FR-SESSION-003 | BUG-AUDIO-001, TEST-AUDIO-001 | CT-CAPTURE-STOP-001, RT-MAC-STOP-001                 | full graph disposal and zero post-Stop frames verified                                                    |
-| FR-SESSION-004 | BUG-AUDIO-001, TEST-AUDIO-001 | CT-CAPTURE-STOP-RACE-001                             | late media creation is disposed and cannot reactivate the adapter                                         |
+| Requirement    | Change                        | Executable evidence                                  | Status                                                                                                          |
+| -------------- | ----------------------------- | ---------------------------------------------------- | --------------------------------------------------------------------------------------------------------------- |
+| NFR-TEST-001   | TOOL-001, CI-001              | `npm run test:coverage`, CI-COVERAGE-001             | verified in GitHub Actions for the enforced scope                                                               |
+| NFR-TEST-002   | TOOL-001, CI-001              | `npm run test:mutation`, CI-MUTATION-001             | verified in GitHub Actions for enforced modules                                                                 |
+| NFR-TEST-003   | CI-001                        | `npm run validate:traceability`, CI-TRACEABILITY-001 | structural matrix validation implemented; requirement-wide executable evidence remains incremental              |
+| FR-AUDIO-004   | SPIKE-AUDIO-001               | UT-CAPTURE-HEALTH-001                                | PCM health classification verified; platform dead-stream evidence remains open                                  |
+| FR-AUDIO-001   | TEST-AUDIO-001                | CT-CAPTURE-CHANNELS-001, RT-MAC-MIC-001              | adapter channel isolation and packaged microphone/system routing verified; main IPC boundary remains open       |
+| FR-AUDIO-005   | TEST-AUDIO-001                | PT-AUDIO-BOUNDS-001, MT-AUDIO-001                    | 60-second per-channel bound matches the newest-byte model across 500 generated sequences                        |
+| FR-AUDIO-007   | SPIKE-AUDIO-001               | RT-MAC-USB-BT-001                                    | HyperX SoloCast USB input and Sony Bluetooth output produced distinct live PCM; meeting-app matrix remains open |
+| FR-SESSION-002 | BUG-AUDIO-001, TEST-AUDIO-001 | CT-CAPTURE-DOUBLE-START-001                          | duplicate Start coalescing verified for microphone and system adapters                                          |
+| FR-SESSION-003 | BUG-AUDIO-001, TEST-AUDIO-001 | CT-CAPTURE-STOP-001, RT-MAC-STOP-001                 | full graph disposal and zero post-Stop frames verified                                                          |
+| FR-SESSION-004 | BUG-AUDIO-001, TEST-AUDIO-001 | CT-CAPTURE-STOP-RACE-001                             | late media creation is disposed and cannot reactivate the adapter                                               |
 
 ## Test ID prefixes
 
