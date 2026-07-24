@@ -1,6 +1,6 @@
 /** @type {import('@stryker-mutator/api/core').PartialStrykerOptions} */
 const config = {
-  mutate: ['src/profile-context.js', 'src/core/**/*.{js,mjs,cjs,ts}'],
+  mutate: ['src/profile-context.js', 'src/core/**/*.{js,mjs,cjs,ts}', 'tools/traceability.mjs'],
   ignorePatterns: [
     'node_modules',
     'dist',

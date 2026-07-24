@@ -20,7 +20,14 @@ export default [
   },
   js.configs.recommended,
   {
-    files: ['main.js', 'preload.js', 'src/**/*.js', 'test/**/*.{js,mjs}', '*.config.mjs'],
+    files: [
+      'main.js',
+      'preload.js',
+      'src/**/*.js',
+      'test/**/*.{js,mjs}',
+      'tools/**/*.mjs',
+      '*.config.mjs',
+    ],
     languageOptions: {
       ecmaVersion: 'latest',
       sourceType: 'commonjs',
@@ -31,7 +38,7 @@ export default [
     rules: commonRules,
   },
   {
-    files: ['test/**/*.mjs', '*.config.mjs'],
+    files: ['test/**/*.mjs', 'tools/**/*.mjs', '*.config.mjs'],
     languageOptions: {
       sourceType: 'module',
     },
