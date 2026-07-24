@@ -6,17 +6,17 @@ The objective is not merely to reach a coverage number. The objective is to make
 
 ## 2. Quality model
 
-| Layer | Purpose | Examples |
-|---|---|---|
-| Requirement acceptance | Prove user-visible outcomes | Stop means stop, selected provider receives audio |
-| Unit | Exhaust pure logic and state transitions | Session state machine, timeline correction |
-| Property-based | Explore broad input/state spaces | Event ordering, bounded buffers, idempotency |
-| Mutation | Detect weak or missing assertions | Lifecycle guards, provider routing, retention |
-| Contract | Ensure adapters obey one interface | Fake, Electron, Swift, STT providers |
-| Integration | Exercise connected components | Capture -> buffer -> STT -> timeline |
-| Electron E2E | Validate UI, IPC, and process boundaries | Start/Stop, settings, errors, session UI |
-| Real-device | Validate macOS and meeting applications | CoreAudio Tap, permissions, Bluetooth |
-| Packaging/security | Validate installable artifact | Signing, notarization, entitlements, Gatekeeper |
+| Layer                  | Purpose                                  | Examples                                          |
+| ---------------------- | ---------------------------------------- | ------------------------------------------------- |
+| Requirement acceptance | Prove user-visible outcomes              | Stop means stop, selected provider receives audio |
+| Unit                   | Exhaust pure logic and state transitions | Session state machine, timeline correction        |
+| Property-based         | Explore broad input/state spaces         | Event ordering, bounded buffers, idempotency      |
+| Mutation               | Detect weak or missing assertions        | Lifecycle guards, provider routing, retention     |
+| Contract               | Ensure adapters obey one interface       | Fake, Electron, Swift, STT providers              |
+| Integration            | Exercise connected components            | Capture -> buffer -> STT -> timeline              |
+| Electron E2E           | Validate UI, IPC, and process boundaries | Start/Stop, settings, errors, session UI          |
+| Real-device            | Validate macOS and meeting applications  | CoreAudio Tap, permissions, Bluetooth             |
+| Packaging/security     | Validate installable artifact            | Signing, notarization, entitlements, Gatekeeper   |
 
 ## 3. Coverage policy
 
@@ -163,4 +163,3 @@ Each change stores:
 - unresolved limitations.
 
 CI output is evidence, not the only record. The change specification links the durable result.
-

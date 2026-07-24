@@ -50,7 +50,7 @@ function load() {
   
   return data;
 }
-function save() { try { fs.writeFileSync(FILE, JSON.stringify(data, null, 2)); } catch (e) { /* ignore */ } }
+function save() { try { fs.writeFileSync(FILE, JSON.stringify(data, null, 2)); } catch (_e) { /* ignore */ } }
 
 module.exports = {
   getSettings() { return load(); },

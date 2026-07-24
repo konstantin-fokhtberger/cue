@@ -2,15 +2,15 @@
 
 ## 1. Document control
 
-| Field | Value |
-|---|---|
-| Product | Personalized cue for macOS |
-| Status | Accepted baseline |
-| Primary device | MacBook Air 15-inch, Apple M2 |
-| Primary OS | macOS 26.5.2, build 25F84 |
-| Primary workflow | Meeting copilot |
-| Secondary workflow | Interview copilot |
-| Tertiary workflow | Screen and coding assistant |
+| Field              | Value                         |
+| ------------------ | ----------------------------- |
+| Product            | Personalized cue for macOS    |
+| Status             | Accepted baseline             |
+| Primary device     | MacBook Air 15-inch, Apple M2 |
+| Primary OS         | macOS 26.5.2, build 25F84     |
+| Primary workflow   | Meeting copilot               |
+| Secondary workflow | Interview copilot             |
+| Tertiary workflow  | Screen and coding assistant   |
 
 ## 2. Product vision
 
@@ -50,14 +50,14 @@ Meeting infrastructure is the shared foundation for the interview profile. Codin
 
 ## 5. Product outcomes
 
-| ID | Outcome | Success evidence |
-|---|---|---|
-| OUT-001 | The application reliably captures local microphone and remote meeting audio | Automated device integration suite and application matrix pass |
-| OUT-002 | The user can understand who said what | Diarized transcript with stable session-scoped speaker labels |
-| OUT-003 | Suggestions arrive while they are still useful | Accepted latency SLOs pass under a defined test workload |
-| OUT-004 | Stop means stop | No audio accepted after the stop deadline in race and real-device tests |
-| OUT-005 | Sensitive data follows explicit policy | Provider, retention, and attachment behavior is visible and testable |
-| OUT-006 | Changes do not regress existing behavior | Required coverage, mutation, integration, E2E, and regression gates pass |
+| ID      | Outcome                                                                     | Success evidence                                                         |
+| ------- | --------------------------------------------------------------------------- | ------------------------------------------------------------------------ |
+| OUT-001 | The application reliably captures local microphone and remote meeting audio | Automated device integration suite and application matrix pass           |
+| OUT-002 | The user can understand who said what                                       | Diarized transcript with stable session-scoped speaker labels            |
+| OUT-003 | Suggestions arrive while they are still useful                              | Accepted latency SLOs pass under a defined test workload                 |
+| OUT-004 | Stop means stop                                                             | No audio accepted after the stop deadline in race and real-device tests  |
+| OUT-005 | Sensitive data follows explicit policy                                      | Provider, retention, and attachment behavior is visible and testable     |
+| OUT-006 | Changes do not regress existing behavior                                    | Required coverage, mutation, integration, E2E, and regression gates pass |
 
 ## 6. In-scope capabilities
 
@@ -124,11 +124,11 @@ The meeting MVP is not releasable until:
 
 ## 10. Product decisions
 
-| ID | Decision | Why it matters |
-|---|---|---|
-| DEC-001 | Accepted | Russian and English with code-switching |
-| DEC-002 | Accepted | 1 to 8 remote speakers |
-| DEC-003 | Accepted | Partial transcript p95 <= 2 seconds; reply first token p95 <= 3 seconds; Stop p95 <= 500 ms |
-| DEC-004 | Accepted | No raw-audio persistence; transcript retained only in active-session memory |
+| ID      | Decision | Why it matters                                                                                      |
+| ------- | -------- | --------------------------------------------------------------------------------------------------- |
+| DEC-001 | Accepted | Russian and English with code-switching                                                             |
+| DEC-002 | Accepted | 1 to 8 remote speakers                                                                              |
+| DEC-003 | Accepted | Partial transcript p95 <= 2 seconds; reply first token p95 <= 3 seconds; Stop p95 <= 500 ms         |
+| DEC-004 | Accepted | No raw-audio persistence; transcript retained only in active-session memory                         |
 | DEC-005 | Accepted | OpenAI diarization as default STT; LLM selected independently; no automatic cross-provider fallback |
-| DEC-006 | Accepted | Signed and notarized personal distribution outside the Mac App Store |
+| DEC-006 | Accepted | Signed and notarized personal distribution outside the Mac App Store                                |

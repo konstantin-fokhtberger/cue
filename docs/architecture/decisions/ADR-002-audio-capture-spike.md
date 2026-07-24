@@ -9,11 +9,11 @@ The repository uses Electron 33 and a loopback configuration that is not a relia
 
 ## Options
 
-| Option | Benefits | Costs and risks |
-|---|---|---|
+| Option                        | Benefits                                                     | Costs and risks                                                          |
+| ----------------------------- | ------------------------------------------------------------ | ------------------------------------------------------------------------ |
 | Modern Electron/CoreAudio Tap | Smallest architecture, one process family, simpler packaging | Chromium behavior, silent dead-stream failure modes, less native control |
-| Swift ScreenCaptureKit helper | Explicit outputs and lifecycle, richer diagnostics | Native toolchain, IPC, signing, failure recovery, higher TCO |
-| Virtual audio device | Fast workaround | User configuration, route fragility, external dependency |
+| Swift ScreenCaptureKit helper | Explicit outputs and lifecycle, richer diagnostics           | Native toolchain, IPC, signing, failure recovery, higher TCO             |
+| Virtual audio device          | Fast workaround                                              | User configuration, route fragility, external dependency                 |
 
 ## Decision
 
