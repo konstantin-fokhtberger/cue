@@ -136,6 +136,9 @@ or introduces a native Swift helper.
 - Real device: packaged Electron 43.2.0 captures separate microphone and system PCM on the
   target M2. `BUG-AUDIO-001` regression creates exactly two worklets and closes both with zero
   post-Stop messages.
+- Bluetooth lifecycle: ten sequential cycles on `.Sony` Bluetooth input/output created 20
+  worklets, closed all 20 contexts, and produced total post-Stop message delta `0` while
+  browser playback continued.
 - Package: Electron 43.2.0 and electron-builder 26.15.3 produce an arm64 app containing the
   expected bundle identifier and audio-capture usage description.
 
@@ -144,7 +147,8 @@ or introduces a native Swift helper.
 - GitHub-hosted M1 packaging cannot prove M2/TCC behavior.
 - Unsigned development builds can produce unstable permission identity.
 - Mixed system audio does not itself identify 1-8 remote speakers.
-- Bluetooth route, sleep/wake, and meeting-app behavior remain separate matrix dimensions.
+- Built-in output, route switching, sleep/wake, and meeting-app behavior remain separate
+  matrix dimensions.
 - Four moderate dependency advisories remain; two are in the production dependency graph.
 - Runtime instrumentation found and verified the fix for `BUG-AUDIO-001`: duplicate
   concurrent system-capture requests are coalesced by a generation-aware resource slot, and

@@ -119,6 +119,9 @@ in-flight generation and disposes a resource that completes after cancellation.
   system fixture.
 - Stop regression: both contexts reached `closed`; a second synthesized system fixture
   produced message deltas `[0, 0]`.
+- Lifecycle regression: ten sequential Start/Stop cycles on `.Sony` Bluetooth input/output
+  created exactly 20 worklets, closed every context, and produced aggregate post-Stop message
+  delta `0` while browser playback continued.
 - Privacy: instrumentation retained aggregate counters only; no raw audio was saved or sent.
 
 ## Residual risks and follow-up

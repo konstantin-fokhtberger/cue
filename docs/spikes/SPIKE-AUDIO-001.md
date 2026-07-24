@@ -57,10 +57,10 @@ required?
 | Microphone-only fixture          | Nonzero mic frames, zero system contamination | pending                    |
 | System playback fixture          | Nonzero system frames and energy              | passed                     |
 | Silence/dead stream              | Explicit `dead` state                         | pending                    |
-| Ten Start/Stop cycles            | No late frames or leaked tracks               | pending                    |
+| Ten Start/Stop cycles            | No late frames or leaked tracks               | passed                     |
 | Permission denied                | Explicit channel-specific failure             | pending                    |
 | Built-in output                  | Healthy system stream                         | pending                    |
-| Bluetooth output                 | Route result recorded                         | pending                    |
+| Bluetooth output                 | Route result recorded                         | passed                     |
 | Zoom/Teams/Meet                  | Separate target-app matrix                    | deferred to TEST-AUDIO-002 |
 
 ## Evidence log
@@ -128,9 +128,28 @@ required?
   `[0, 0]`.
 - The probe retained aggregate counters only; it did not persist or transmit raw audio.
 
+### 2026-07-24 - Bluetooth route and ten-cycle lifecycle
+
+- `system_profiler SPAudioDataType` reported `.Sony` as both default input and default output.
+  Both devices used Bluetooth transport; input ran at 16 kHz and output at 44.1 kHz.
+- A browser video supplied continuous real system audio through the Bluetooth output. No
+  synthetic audio was injected during this experiment.
+- Ten sequential Start/Stop cycles created 20 worklets total, exactly two per cycle.
+- Every pair was labelled `Default - .Sony (Bluetooth)` and `System audio`; both tracks
+  delivered PCM frames in every cycle.
+- System-channel RMS varied from 53 to 4472 across video segments. Low-energy segments still
+  delivered frames and nonzero samples and therefore were not classified as dead streams.
+- All 20 AudioContexts reached `closed`. While the browser video continued, a 2.2-second
+  post-Stop observation measured total message delta `0`.
+- The Bluetooth scenario indicates channel separation but does not close the deterministic
+  microphone-only crosstalk criterion; that remains in `TEST-AUDIO-001`.
+- Instrumentation retained labels and aggregate counters only; no raw audio was persisted or
+  transmitted.
+
 ## Preliminary conclusion
 
 No architecture decision yet. The inherited Electron 33 path is rejected as evidence. Electron
 43.2.0 passes dependency, quality, package, launch, separate live PCM, and single-cycle Stop
-gates. The next experiments must cover microphone isolation, dead-stream detection, repeated
-Start/Stop, permission denial, output routes, and target meeting applications.
+gates. Bluetooth playback and ten sequential Start/Stop cycles also pass. The next experiments
+must cover deterministic microphone isolation, dead-stream detection, permission denial,
+built-in output, route switching, and target meeting applications.
