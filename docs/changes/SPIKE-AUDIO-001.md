@@ -127,9 +127,9 @@ or introduces a native Swift helper.
 ## Verification evidence
 
 - CI: pending.
-- Coverage: 21 tests pass with 100% statements, branches, functions, and lines for the
+- Coverage: 31 tests pass with 100% statements, branches, functions, and lines for the
   currently enforced scope.
-- Mutation: 133/133 mutants killed; mutation score 100%.
+- Mutation: 184/184 mutants killed; mutation score 100%.
 - Performance: pending.
 - Real device: packaged Electron 43.2.0 app launches on the target M2; capture pending.
 - Package: Electron 43.2.0 and electron-builder 26.15.3 produce an arm64 app containing the

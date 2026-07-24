@@ -23,7 +23,7 @@ export default [
     files: [
       'main.js',
       'preload.js',
-      'src/**/*.js',
+      'src/**/*.{js,mjs}',
       'test/**/*.{js,mjs}',
       'tools/**/*.mjs',
       '*.config.mjs',
@@ -38,7 +38,7 @@ export default [
     rules: commonRules,
   },
   {
-    files: ['test/**/*.mjs', 'tools/**/*.mjs', '*.config.mjs'],
+    files: ['src/**/*.mjs', 'test/**/*.mjs', 'tools/**/*.mjs', '*.config.mjs'],
     languageOptions: {
       sourceType: 'module',
     },

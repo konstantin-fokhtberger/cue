@@ -80,13 +80,23 @@ required?
 - Full dependency advisories decreased from 13, including high and critical, to 4 moderate.
 - Production dependency audit still reports 2 moderate transitive advisories through
   `gaxios`/`uuid`.
-- `npm run quality:full` passes with 21 tests, 100% structural coverage, and 133/133 mutants
+- `npm run quality:full` passes with 31 tests, 100% structural coverage, and 184/184 mutants
   killed.
 - `npm run pack` produces `dist/mac-arm64/cue.app`.
 - `script/build_and_run.sh --verify` launches the packaged process successfully.
 - The packaged bundle identifier is `com.cue.overlay` and its Info.plist contains
   `NSAudioCaptureUsageDescription`.
 - No conclusion about microphone or system-audio capture is drawn from process launch.
+
+### 2026-07-24 - PCM health model
+
+- Added reusable PCM16 frame analysis for frame count, sample count, nonzero samples, energy,
+  RMS, and peak.
+- Added explicit `idle`, `waiting`, `dead`, `silent`, and `healthy` classifications.
+- Dead classification requires both an expected signal and expiry of the observation deadline;
+  ordinary quiet system audio is not mislabeled as dead.
+- The model has 100% structural coverage, 500 property-based generated cases, and 51/51 killed
+  mutants.
 
 ## Preliminary conclusion
 
