@@ -112,6 +112,8 @@ in-flight generation and disposes a resource that completes after cancellation.
   107/107.
 - Mutation: 213/213 mutants killed; mutation score 100%.
 - Package: Electron 43.2.0 arm64 directory package completes.
+- CI: [Pull request quality run 30111375553](https://github.com/konstantin-fokhtberger/cue/actions/runs/30111375553)
+  passed (`quality` and `package-macos-arm64`).
 - Real device: one Start produced exactly two worklets with 828 messages each before Stop.
   Their RMS values were 156 and 3906, separating ambient microphone input from the synthesized
   system fixture.

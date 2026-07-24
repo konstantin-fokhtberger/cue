@@ -127,7 +127,8 @@ or introduces a native Swift helper.
 
 ## Verification evidence
 
-- CI: pending.
+- CI: [Pull request quality run 30111375553](https://github.com/konstantin-fokhtberger/cue/actions/runs/30111375553)
+  passed (`quality` and `package-macos-arm64`).
 - Coverage: 37 tests pass with 100% statements, branches, functions, and lines for the
   currently enforced scope.
 - Mutation: 213/213 mutants killed; mutation score 100%.
