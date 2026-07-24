@@ -8,6 +8,7 @@ const { createLLM } = require('./src/llm');
 const { MODES } = require('./src/prompts');
 const { appendResumeContext } = require('./src/profile-context');
 const { rms16 } = require('./src/wav');
+const { BoundedPcmBuffer } = require('./src/core/bounded-pcm-buffer');
 
 let win = null;
 let registeredAssistShortcut = null;
@@ -21,7 +22,12 @@ const RESERVED_SHORTCUTS = new Set([
 // -------- capture / transcript state --------
 const state = { capturing: false, busy: false, transcribing: { you: false, them: false } };
 let sttDisabled = false; // set when the key can't reach any speech model (stops retry spam)
-const buffers = { you: [], them: [] };
+const PCM_BYTES_PER_SECOND = 16000 * 2;
+const PCM_BUFFER_MAX_BYTES = PCM_BYTES_PER_SECOND * 60;
+const buffers = {
+  you: new BoundedPcmBuffer(PCM_BUFFER_MAX_BYTES),
+  them: new BoundedPcmBuffer(PCM_BUFFER_MAX_BYTES),
+};
 const transcript = []; // { channel, text, ts }
 const FLUSH_MS = 3500;
 const MIN_BYTES = Math.floor(16000 * 2 * 0.6); // ~0.6s
@@ -73,10 +79,8 @@ function createWindow() {
 // -------- STT flushing --------
 async function flushChannel(channel) {
   if (state.transcribing[channel]) return;
-  const chunks = buffers[channel];
-  if (!chunks.length) return;
-  const pcm = Buffer.concat(chunks);
-  buffers[channel] = [];
+  const pcm = buffers[channel].drain();
+  if (!pcm.length) return;
   if (pcm.length < MIN_BYTES) return;
   if (rms16(pcm) < RMS_GATE) return; // silence gate
 
@@ -134,7 +138,7 @@ function setCapturing(active) {
     startFlushLoop();
   } else {
     stopFlushLoop();
-    buffers.you = []; buffers.them = [];
+    buffers.you.clear(); buffers.them.clear();
   }
   send('capture:state', { active });
   return active;

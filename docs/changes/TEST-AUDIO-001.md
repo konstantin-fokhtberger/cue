@@ -120,22 +120,29 @@ devices, or Electron globals.
 
 ## Verification evidence
 
-- CI: pending.
-- Coverage: 46 tests pass; statements 165/165, branches 73/73, functions 38/38, and lines
-  160/160.
-- Mutation: 268/268 mutants killed; mutation score 100%.
+- CI: [Pull request quality run 30114466885](https://github.com/konstantin-fokhtberger/cue/actions/runs/30114466885)
+  passed (`quality` and `package-macos-arm64`) for the adapter slice.
+- Coverage: 56 tests pass; statements 196/196, branches 81/81, functions 46/46, and lines
+  191/191.
+- Mutation: 307/307 mutants killed; mutation score 100%.
 - Performance: pending.
 - Contract: nine deterministic adapter tests cover graph wiring, exact channel routing,
   duplicate Start, active Stop, Stop-during-Start, typed permission denial, missing tracks,
   and partial initialization failure.
-- Acceptance: criteria 1-8 and 10 pass; bounded-buffer criterion 9 remains pending.
+- Buffer: a 60-second, 1,920,000-byte limit per PCM16 mono channel retains newest audio and
+  reports exact overflow bytes/events. Five hundred property-based sequences match the
+  reference model.
+- Acceptance: criteria 1-10 pass for the implemented adapter and buffer slices.
 - Real device: Bluetooth ten-cycle baseline passed before extraction. After extraction, two
   packaged cycles retained `.Sony (Bluetooth)` and `System audio` labels, closed all four
   contexts, and produced post-Stop deltas `[0, 0]`.
 - Package: Electron 43.2.0 arm64 directory package completes with the extracted adapter.
+- Buffer integration runtime: both IPC channels received 187 frames and 23936 samples in a
+  packaged cycle; both contexts closed and post-Stop deltas were `[0, 0]`.
 
 ## Residual risks and follow-up
 
 - Fake Web Audio contracts cannot prove Chromium or CoreAudio behavior.
 - Main-process IPC validation remains `SEC-IPC-001`.
-- Bounded buffering and 100-cycle stress remain separate slices within this backlog item.
+- Overflow metrics are not yet emitted through the telemetry port.
+- Electron E2E and the 100-cycle automated stress gate remain open within this backlog item.

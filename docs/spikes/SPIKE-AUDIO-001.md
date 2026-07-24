@@ -152,9 +152,13 @@ required?
 - Both channels now share duplicate-Start coalescing, generation cancellation, typed
   permission errors, no-track handling, and partial-start cleanup.
 - Nine deterministic contract tests cover the adapter without Electron or macOS globals.
-- Full gates pass locally with 46 tests, 100% structural coverage, and 268/268 killed mutants.
+- Added a 60-second bound per PCM channel with newest-audio retention and exact overflow
+  metrics; 500 generated sequences match an independent reference model.
+- Full gates pass locally with 56 tests, 100% structural coverage, and 307/307 killed mutants.
 - Two packaged Bluetooth/video cycles after extraction retained separate `.Sony (Bluetooth)`
   and `System audio` tracks. All four contexts closed and both post-Stop deltas were `[0, 0]`.
+- A packaged cycle after bounded-buffer integration delivered 187 frames per channel and
+  retained zero post-Stop messages.
 
 ## Preliminary conclusion
 

@@ -66,6 +66,7 @@
 | NFR-TEST-003   | CI-001                        | `npm run validate:traceability`, CI-TRACEABILITY-001 | structural matrix validation implemented; requirement-wide executable evidence remains incremental        |
 | FR-AUDIO-004   | SPIKE-AUDIO-001               | UT-CAPTURE-HEALTH-001                                | PCM health classification verified; platform dead-stream evidence remains open                            |
 | FR-AUDIO-001   | TEST-AUDIO-001                | CT-CAPTURE-CHANNELS-001, RT-MAC-MIC-001              | adapter channel isolation and packaged microphone/system routing verified; main IPC boundary remains open |
+| FR-AUDIO-005   | TEST-AUDIO-001                | PT-AUDIO-BOUNDS-001, MT-AUDIO-001                    | 60-second per-channel bound matches the newest-byte model across 500 generated sequences                  |
 | FR-SESSION-002 | BUG-AUDIO-001, TEST-AUDIO-001 | CT-CAPTURE-DOUBLE-START-001                          | duplicate Start coalescing verified for microphone and system adapters                                    |
 | FR-SESSION-003 | BUG-AUDIO-001, TEST-AUDIO-001 | CT-CAPTURE-STOP-001, RT-MAC-STOP-001                 | full graph disposal and zero post-Stop frames verified                                                    |
 | FR-SESSION-004 | BUG-AUDIO-001, TEST-AUDIO-001 | CT-CAPTURE-STOP-RACE-001                             | late media creation is disposed and cannot reactivate the adapter                                         |
