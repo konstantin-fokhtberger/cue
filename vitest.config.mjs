@@ -9,7 +9,11 @@ export default defineConfig({
     restoreMocks: true,
     coverage: {
       provider: 'v8',
-      include: ['src/profile-context.js', 'src/core/**/*.{js,mjs,cjs,ts}'],
+      include: [
+        'src/profile-context.js',
+        'src/core/**/*.{js,mjs,cjs,ts}',
+        'tools/traceability.mjs',
+      ],
       exclude: ['**/*.test.*'],
       reporter: ['text', 'json-summary', 'html'],
       thresholds: {
