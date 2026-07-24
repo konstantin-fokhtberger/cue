@@ -29,4 +29,3 @@ The first personalized release supports only the specified macOS environment. Wi
 
 - A second device or macOS version becomes a required target.
 - Windows support becomes a product priority.
-

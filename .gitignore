@@ -5,3 +5,6 @@ native/systemaudio
 *.log
 .DS_Store
 cue-data.json
+coverage/
+reports/
+.stryker-tmp/

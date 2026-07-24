@@ -145,4 +145,3 @@ Use metrics as signals, not targets to game:
 - p95 capture start/stop latency;
 - p95 transcript and suggestion latency;
 - real-device matrix pass rate.
-

@@ -68,4 +68,3 @@ Runtime changes without a requirement, acceptance criteria, and test evidence ar
 - Use small branches and reviewable commits tied to backlog IDs.
 - Do not mix documentation, architecture, dependency, and feature changes unless the change specification explains why they are inseparable.
 - Never bypass failing tests, coverage, mutation, security, or packaging gates to merge a change.
-

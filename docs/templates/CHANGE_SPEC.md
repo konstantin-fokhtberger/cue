@@ -2,13 +2,13 @@
 
 ## Control
 
-| Field | Value |
-|---|---|
-| Backlog ID | |
-| Requirement IDs | |
-| Status | proposed |
-| Owner | |
-| Target revision | |
+| Field           | Value    |
+| --------------- | -------- |
+| Backlog ID      |          |
+| Requirement IDs |          |
+| Status          | proposed |
+| Owner           |          |
+| Target revision |          |
 
 ## Outcome
 
@@ -40,8 +40,8 @@ Describe the user or engineering outcome, not the intended code edit.
 ## Alternatives considered
 
 | Option | Benefits | Costs and risks | Decision |
-|---|---|---|---|
-| | | | |
+| ------ | -------- | --------------- | -------- |
+|        |          |                 |          |
 
 ## Acceptance criteria
 
@@ -50,20 +50,20 @@ Describe the user or engineering outcome, not the intended code edit.
 ## Failure modes
 
 | Failure | Expected behavior | Test ID |
-|---|---|---|
-| | | |
+| ------- | ----------------- | ------- |
+|         |                   |         |
 
 ## Test plan
 
-| Level | Test IDs | Purpose |
-|---|---|---|
-| Unit | | |
-| Property | | |
-| Mutation | | |
-| Contract | | |
-| Integration | | |
-| E2E | | |
-| Real device | | |
+| Level       | Test IDs | Purpose |
+| ----------- | -------- | ------- |
+| Unit        |          |         |
+| Property    |          |         |
+| Mutation    |          |         |
+| Contract    |          |         |
+| Integration |          |         |
+| E2E         |          |         |
+| Real device |          |         |
 
 ## Security and privacy
 

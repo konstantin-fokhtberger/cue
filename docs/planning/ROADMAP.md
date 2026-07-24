@@ -116,4 +116,3 @@ Add explicit screen-based assistance as an isolated capability.
 - Coding response modes.
 - Screen-content safety and prompt-injection tests.
 - Language and formatting preferences.
-

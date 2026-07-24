@@ -106,7 +106,7 @@ async function flushChannel(channel) {
   }
 }
 
-function handleSttError(err, settings) {
+function handleSttError(err, _settings) {
   console.log('[stt] error', err.provider, err.status, err.code, err.message);
   if (sttDisabled) return;
   const noAccess = err.status === 403 || err.status === 401 || err.code === 'model_not_found';
