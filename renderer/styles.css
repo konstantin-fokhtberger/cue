@@ -56,7 +56,7 @@ html, body {
 }
 #toolbar, #panel-wrap, #settings-scrim, #onboard-scrim { pointer-events: auto; }
 #toolbar { -webkit-app-region: drag; }   /* the pill is the window's drag handle */
-.no-drag, button, input, textarea { -webkit-app-region: no-drag; }
+.no-drag, button, input, select, textarea { -webkit-app-region: no-drag; }
 
 /* ============================ Toolbar pill ============================ */
 #toolbar {
@@ -242,7 +242,7 @@ button:focus { outline: none; }
 .s-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
 .s-title { font-size: 17px; font-weight: 600; color: var(--tx-1); }
 .s-close { border: none; background: var(--accent); color: #fff; font-weight: 600; font-size: 13px; padding: 6px 14px; border-radius: var(--r-pill); cursor: pointer; }
-.s-body { display: flex; flex-direction: column; gap: 8px; }
+.s-body { display: flex; flex-direction: column; gap: 8px; max-height: 76vh; overflow-y: auto; padding-right: 3px; }
 .s-label { color: var(--tx-2); font-size: 13px; font-weight: 600; margin-top: 8px; }
 .s-hint { color: var(--tx-mut); font-weight: 400; font-size: 11px; margin-left: 6px; }
 .s-seg { display: flex; gap: 6px; }
@@ -252,6 +252,14 @@ button:focus { outline: none; }
 .s-field span { width: 78px; color: var(--tx-mut); font-size: 12px; }
 .s-field input { flex: 1; padding: 8px 10px; border-radius: var(--r-8); border: 1px solid rgba(255,255,255,0.14); background: rgba(0,0,0,0.25); color: var(--tx-1); font-size: 13px; font-family: var(--font); outline: none; }
 .s-field input:focus { border-color: var(--accent); }
+.s-field select { flex: 1; min-width: 0; padding: 8px 28px 8px 10px; border-radius: var(--r-8); border: 1px solid rgba(255,255,255,0.14); background: rgba(0,0,0,0.25); color: var(--tx-1); font-size: 13px; font-family: var(--font); outline: none; }
+.s-field select:focus { border-color: var(--accent); }
+.s-field select option { color: #111; background: #fff; }
+.s-field select option:disabled { color: #777; }
+.s-device-status { min-height: 15px; margin-left: 88px; color: var(--tx-mut); font-size: 11px; line-height: 1.35; }
+.s-device-status.error { color: #ff9d8f; }
+.s-device-status.success { color: #78dba0; }
+.s-device-note { margin-left: 88px; color: var(--tx-mut); font-size: 11px; line-height: 1.4; }
 .s-textarea { box-sizing: border-box; width: 100%; min-height: 112px; padding: 8px 10px; resize: vertical; border: 1px solid rgba(255,255,255,0.14); border-radius: var(--r-8); background: rgba(0,0,0,0.25); color: var(--tx-1); font: 13px/1.45 var(--font); outline: none; }
 .s-textarea:focus { border-color: var(--accent); }
 .s-resume-actions { display: flex; align-items: center; justify-content: space-between; }

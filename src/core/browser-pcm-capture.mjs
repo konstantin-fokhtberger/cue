@@ -13,7 +13,12 @@ function captureStartError(channel, error) {
   if (error instanceof PcmCaptureStartError) {
     return error;
   }
-  const code = error && error.name === 'NotAllowedError' ? 'permission-denied' : 'initialization-failed';
+  let code = 'initialization-failed';
+  if (error && error.name === 'NotAllowedError') {
+    code = 'permission-denied';
+  } else if (error && (error.name === 'NotFoundError' || error.name === 'OverconstrainedError')) {
+    code = 'device-unavailable';
+  }
   return new PcmCaptureStartError(channel, code, error);
 }
 

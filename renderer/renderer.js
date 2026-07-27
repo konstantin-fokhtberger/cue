@@ -1,4 +1,11 @@
 import { BrowserPcmCapture } from '../src/core/browser-pcm-capture.mjs';
+import {
+  applyOutputSelection,
+  buildAudioDeviceOptions,
+  buildMicrophoneConstraints,
+  describeEffectiveInput,
+  normalizeAudioDeviceId,
+} from '../src/core/audio-device-policy.mjs';
 
 /* cue renderer — UI state, mic capture, IPC, streaming render. */
 (function () {
@@ -28,6 +35,12 @@ import { BrowserPcmCapture } from '../src/core/browser-pcm-capture.mjs';
   let caretEl = null;
   let assistShortcut = DEFAULT_ASSIST_SHORTCUT;
   let recordingShortcut = false;
+  let captureActive = false;
+  let effectiveInput = null;
+  let effectiveOutput = null;
+  let availableInputIds = new Set(['default']);
+  let availableOutputLabels = new Map([['default', 'system default']]);
+  const cuePlayback = new Audio();
 
   const messages = $('#messages');
 
@@ -193,9 +206,9 @@ import { BrowserPcmCapture } from '../src/core/browser-pcm-capture.mjs';
   const microphoneCapture = new BrowserPcmCapture({
     ...browserAudioDependencies,
     channel: 'microphone',
-    openStream: () => navigator.mediaDevices.getUserMedia({
-      audio: { echoCancellation: true, noiseSuppression: true, channelCount: 1 },
-    }),
+    openStream: () => navigator.mediaDevices.getUserMedia(
+      buildMicrophoneConstraints(currentAudioDeviceId('inputId')),
+    ),
     onStarted: () => cue.log('microphone audio: capturing'),
     onPcm: (pcm) => cue.micPcm(pcm),
   });
@@ -218,6 +231,12 @@ import { BrowserPcmCapture } from '../src/core/browser-pcm-capture.mjs';
   function startCapture(capture, label) {
     return capture.start().catch((error) => {
       cue.log(label + ' audio error: ' + (error && error.message));
+      if (label === 'microphone') {
+        effectiveInput = null;
+        const code = error && error.code ? error.code : 'initialization-failed';
+        setDeviceStatus('#audio-input-effective', 'Input unavailable: ' + code, 'error');
+        showStatus('Microphone capture degraded: ' + code + '. cue did not switch to another input.');
+      }
       return null;
     });
   }
@@ -226,13 +245,21 @@ import { BrowserPcmCapture } from '../src/core/browser-pcm-capture.mjs';
     capture.stop().catch((error) => cue.log(label + ' audio stop error: ' + (error && error.message)));
   }
 
-  function startMic() { return startCapture(microphoneCapture, 'microphone'); }
+  async function startMic() {
+    const resource = await startCapture(microphoneCapture, 'microphone');
+    if (!resource) return null;
+    const track = resource.stream.getAudioTracks()[0];
+    effectiveInput = describeEffectiveInput(track, currentAudioDeviceId('inputId'));
+    syncAudioDeviceStatus();
+    return resource;
+  }
   function stopMic() { stopCapture(microphoneCapture, 'microphone'); }
   function startSystemAudio() { return startCapture(systemAudioCapture, 'system'); }
   function stopSystemAudio() { stopCapture(systemAudioCapture, 'system'); }
 
   // ---- events from main --------------------------------------------------
   cue.on('capture:state', ({ active }) => {
+    captureActive = active;
     $('#live-dot').classList.toggle('off', !active);
     $('#stop-btn').classList.toggle('active', active);
     if (active) { startMic(); startSystemAudio(); } else { stopMic(); stopSystemAudio(); }
@@ -267,7 +294,11 @@ import { BrowserPcmCapture } from '../src/core/browser-pcm-capture.mjs';
 
   // ---- settings ----------------------------------------------------------
   const scrim = $('#settings-scrim');
-  function openSettings() { fillSettings(); scrim.classList.remove('hidden'); }
+  function openSettings() {
+    fillSettings();
+    scrim.classList.remove('hidden');
+    refreshAudioDevices();
+  }
   function closeSettings() { cancelShortcutRecording(); saveSettings(); scrim.classList.add('hidden'); }
   $('#more-btn').addEventListener('click', openSettings);
   $('#s-close').addEventListener('click', closeSettings);
@@ -282,6 +313,8 @@ import { BrowserPcmCapture } from '../src/core/browser-pcm-capture.mjs';
     $('#resume-context').value = settings.resumeContext || '';
     const m = settings.models[settings.provider] || { fast: '', smart: '' };
     $('#model-fast').value = m.fast; $('#model-smart').value = m.smart;
+    ensureAudioDeviceSettings();
+    syncAudioDeviceStatus();
     syncAssistShortcutLabels();
     $('#s-status').textContent = statusText();
   }
@@ -314,6 +347,152 @@ import { BrowserPcmCapture } from '../src/core/browser-pcm-capture.mjs';
     settings.models[settings.provider].smart = $('#model-smart').value.trim();
     await cue.settingsSet(settings);
   }
+
+  function ensureAudioDeviceSettings() {
+    if (!settings.audioDevices) settings.audioDevices = {};
+    settings.audioDevices.inputId = normalizeAudioDeviceId(settings.audioDevices.inputId);
+    settings.audioDevices.outputId = normalizeAudioDeviceId(settings.audioDevices.outputId);
+  }
+
+  function currentAudioDeviceId(key) {
+    ensureAudioDeviceSettings();
+    return settings.audioDevices[key];
+  }
+
+  function renderDeviceOptions(select, options, selectedId) {
+    select.innerHTML = '';
+    options.forEach((device) => {
+      const option = document.createElement('option');
+      option.value = device.id;
+      option.textContent = device.label;
+      option.disabled = !device.available;
+      option.selected = device.id === selectedId;
+      select.appendChild(option);
+    });
+  }
+
+  function setDeviceStatus(selector, message, kind) {
+    const element = $(selector);
+    element.textContent = message;
+    element.classList.toggle('error', kind === 'error');
+    element.classList.toggle('success', kind === 'success');
+  }
+
+  function syncAudioDeviceStatus() {
+    const requestedInput = currentAudioDeviceId('inputId');
+    if (!availableInputIds.has(requestedInput)) {
+      setDeviceStatus('#audio-input-effective', 'Selected input is unavailable', 'error');
+    } else if (effectiveInput && effectiveInput.requestedId === requestedInput) {
+      setDeviceStatus(
+        '#audio-input-effective',
+        'Effective: ' + effectiveInput.effectiveLabel,
+        'success',
+      );
+    } else {
+      setDeviceStatus(
+        '#audio-input-effective',
+        requestedInput === 'default'
+          ? 'Effective: system default when capture starts'
+          : 'Effective: verified when capture starts',
+        '',
+      );
+    }
+
+    const requestedOutput = currentAudioDeviceId('outputId');
+    if (effectiveOutput && effectiveOutput.requestedId === requestedOutput) {
+      setDeviceStatus(
+        '#audio-output-effective',
+        'Effective: ' +
+          (availableOutputLabels.get(effectiveOutput.effectiveId) || effectiveOutput.effectiveId),
+        'success',
+      );
+    } else {
+      setDeviceStatus('#audio-output-effective', 'Effective: not verified', '');
+    }
+  }
+
+  async function applyCueOutput() {
+    const requestedId = currentAudioDeviceId('outputId');
+    try {
+      effectiveOutput = await applyOutputSelection(cuePlayback, requestedId);
+      syncAudioDeviceStatus();
+      return true;
+    } catch (error) {
+      effectiveOutput = null;
+      setDeviceStatus(
+        '#audio-output-effective',
+        'Output unavailable: ' + (error && error.code ? error.code : 'selection-failed'),
+        'error',
+      );
+      return false;
+    }
+  }
+
+  async function refreshAudioDevices() {
+    ensureAudioDeviceSettings();
+    let devices = [];
+    try {
+      devices = await navigator.mediaDevices.enumerateDevices();
+    } catch (error) {
+      cue.log('audio device enumeration error: ' + (error && error.message));
+    }
+    const inputOptions = buildAudioDeviceOptions(
+      devices,
+      'audioinput',
+      settings.audioDevices.inputId,
+    );
+    const outputOptions = buildAudioDeviceOptions(
+      devices,
+      'audiooutput',
+      settings.audioDevices.outputId,
+    );
+    availableInputIds = new Set(
+      inputOptions.filter((device) => device.available).map((device) => device.id),
+    );
+    availableOutputLabels = new Map(
+      outputOptions
+        .filter((device) => device.available)
+        .map((device) => [device.id, device.label]),
+    );
+    renderDeviceOptions(
+      $('#audio-input'),
+      inputOptions,
+      settings.audioDevices.inputId,
+    );
+    renderDeviceOptions(
+      $('#audio-output'),
+      outputOptions,
+      settings.audioDevices.outputId,
+    );
+    syncAudioDeviceStatus();
+    await applyCueOutput();
+  }
+
+  async function saveAudioDeviceSelection(key, value) {
+    ensureAudioDeviceSettings();
+    settings.audioDevices[key] = normalizeAudioDeviceId(value);
+    await cue.settingsSet({ audioDevices: settings.audioDevices });
+  }
+
+  $('#audio-input').addEventListener('change', async (event) => {
+    await saveAudioDeviceSelection('inputId', event.target.value);
+    effectiveInput = null;
+    syncAudioDeviceStatus();
+    if (captureActive) {
+      await microphoneCapture.stop();
+      await startMic();
+    }
+    await refreshAudioDevices();
+  });
+
+  $('#audio-output').addEventListener('change', async (event) => {
+    await saveAudioDeviceSelection('outputId', event.target.value);
+    await refreshAudioDevices();
+  });
+
+  navigator.mediaDevices.addEventListener('devicechange', () => {
+    refreshAudioDevices();
+  });
 
   // Assist shortcut recorder. The renderer captures a key combination and the
   // main process only saves it after Electron confirms the global registration.
@@ -513,6 +692,7 @@ import { BrowserPcmCapture } from '../src/core/browser-pcm-capture.mjs';
   // ---- boot --------------------------------------------------------------
   (async function boot() {
     settings = await cue.settingsGet();
+    ensureAudioDeviceSettings();
     assistShortcut = (settings.shortcuts && settings.shortcuts.assist) || DEFAULT_ASSIST_SHORTCUT;
     syncAssistShortcutLabels();
     smartBtn.classList.toggle('on', !!settings.smart);
@@ -522,6 +702,7 @@ import { BrowserPcmCapture } from '../src/core/browser-pcm-capture.mjs';
     $('#live-dot').classList.toggle('off', !st.active);
     $('#stop-btn').classList.toggle('active', st.active);
     if (!settings.onboarded) showOnboard();
+    await refreshAudioDevices();
 
   })();
 })();

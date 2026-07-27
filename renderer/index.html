@@ -81,6 +81,13 @@
         <div class="s-field"><span>Fast</span><input id="model-fast" type="text" autocomplete="off" /></div>
         <div class="s-field"><span>Smart</span><input id="model-smart" type="text" autocomplete="off" /></div>
 
+        <label class="s-label">Audio devices <span class="s-hint">cue settings only</span></label>
+        <div class="s-field s-device"><span>Input</span><select id="audio-input"></select></div>
+        <div class="s-device-status" id="audio-input-effective"></div>
+        <div class="s-field s-device"><span>Output</span><select id="audio-output"></select></div>
+        <div class="s-device-status" id="audio-output-effective"></div>
+        <div class="s-device-note">Meeting input/output must still be selected separately in Zoom, Teams, or Meet. cue output affects cue-owned playback only, not system-audio capture.</div>
+
         <label class="s-label">Keyboard shortcuts</label>
         <div class="s-shortcut">
           <span>Assist</span>

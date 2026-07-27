@@ -190,6 +190,26 @@ describe('BrowserPcmCapture contract', () => {
     },
   );
 
+  it.each(['NotFoundError', 'OverconstrainedError'])(
+    'reports %s as a device-unavailable start failure',
+    async (name) => {
+      const cause = new Error(name);
+      cause.name = name;
+      const harness = createHarness({
+        openStream: vi.fn().mockRejectedValue(cause),
+      });
+
+      await expect(harness.adapter.start()).rejects.toMatchObject({
+        name: 'PcmCaptureStartError',
+        channel: 'microphone',
+        code: 'device-unavailable',
+        cause,
+      });
+      expect(harness.dependencies.createAudioContext).not.toHaveBeenCalled();
+      expect(harness.adapter.active).toBe(false);
+    },
+  );
+
   it('rejects a stream without audio tracks and releases every track', async () => {
     const harness = createHarness();
     harness.stream.getAudioTracks.mockReturnValue([]);
