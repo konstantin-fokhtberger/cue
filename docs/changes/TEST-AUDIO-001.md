@@ -6,7 +6,7 @@
 | --------------- | ------------------------------------------ |
 | Backlog ID      | TEST-AUDIO-001                             |
 | Requirement IDs | FR-AUDIO-001, 004, 005; FR-SESSION-002-004 |
-| Status          | in progress                                |
+| Status          | verified                                   |
 | Owner           | project maintainer                         |
 | Target revision | `spike/SPIKE-AUDIO-001-electron-capture`   |
 
@@ -143,6 +143,8 @@ observe zero provider requests and zero PCM callbacks after the cycle has reache
 
 ## Verification evidence
 
+- CI: [Pull request quality run 30257462532](https://github.com/konstantin-fokhtberger/cue/actions/runs/30257462532)
+  passed both `quality` and `package-macos-arm64`, including packaged Electron lifecycle E2E.
 - CI: [Pull request quality run 30114466885](https://github.com/konstantin-fokhtberger/cue/actions/runs/30114466885)
   passed (`quality` and `package-macos-arm64`) for the adapter slice.
 - Coverage: 56 tests pass; statements 196/196, branches 81/81, functions 46/46, and lines
@@ -151,7 +153,8 @@ observe zero provider requests and zero PCM callbacks after the cycle has reache
 - Current enforced suite: 140 tests pass; statements 413/413, branches 229/229, functions
   89/89, and lines 405/405.
 - Current mutation gate: 814/814 mutants killed; mutation score 100%.
-- Performance: pending.
+- Performance: no latency claim is made by this lifecycle slice; `PERF-STOP-001` remains in
+  `TEST-AUDIO-002`.
 - Contract: nine deterministic adapter tests cover graph wiring, exact channel routing,
   duplicate Start, active Stop, Stop-during-Start, typed permission denial, missing tracks,
   and partial initialization failure.

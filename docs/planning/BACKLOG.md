@@ -37,7 +37,7 @@
 | AUDIO-DEVICE-001  | EPIC-002 |       P0 | active   | Explicit cue input/output selectors and effective-device diagnostics | ADR-DEVICE-001, TEST-AUDIO-001            |
 | AUDIO-DIAG-001    | EPIC-002 |       P0 | done     | Local provider-free microphone/output diagnostics                    | AUDIO-DEVICE-001, TEST-AUDIO-001          |
 | BUG-PKG-001       | EPIC-006 |       P0 | done     | Стабилизировать identity `com.cue.overlay` в тестовых macOS-пакетах  | SPIKE-AUDIO-001                           |
-| TEST-AUDIO-001    | EPIC-002 |       P0 | active   | Capture adapter contract suite and deterministic audio fixtures      | TOOL-001                                  |
+| TEST-AUDIO-001    | EPIC-002 |       P0 | done     | Capture adapter contract suite and deterministic audio fixtures      | TOOL-001                                  |
 | TEST-AUDIO-002    | EPIC-002 |       P0 | proposed | Zoom/Teams/Meet x accepted audio-route automation matrix             | SPIKE-AUDIO-001, AUDIO-DEVICE-001, CI-002 |
 | ADR-AUDIO-001     | EPIC-002 |       P0 | proposed | Accept Electron adapter or Swift helper based on spike               | SPIKE-AUDIO-001, TEST-AUDIO-002           |
 | ARCH-SESSION-001  | EPIC-003 |       P0 | proposed | Pure session state machine with generation cancellation              | TOOL-001                                  |
