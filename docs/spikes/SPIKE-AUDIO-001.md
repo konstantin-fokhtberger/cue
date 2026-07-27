@@ -49,21 +49,21 @@ required?
 
 ## Experiment matrix
 
-| Experiment                       | Expected evidence                             | Status                     |
-| -------------------------------- | --------------------------------------------- | -------------------------- |
-| Supported Electron clean install | Locked dependency graph                       | passed                     |
-| Local quality and package        | Green gates, arm64 `.app`                     | passed                     |
-| Packaged launch                  | Stable process and bundle metadata            | passed                     |
-| Microphone-only fixture          | Nonzero mic frames, zero system contamination | pending                    |
-| System playback fixture          | Nonzero system frames and energy              | passed                     |
-| Silence/dead stream              | Explicit `dead` state                         | pending                    |
-| Ten Start/Stop cycles            | No late frames or leaked tracks               | passed                     |
-| Permission denied                | Explicit channel-specific failure             | pending                    |
-| Built-in output                  | Healthy system stream                         | pending                    |
-| Bluetooth output                 | Route result recorded                         | passed                     |
-| USB mic + Bluetooth output       | Separate live PCM and lifecycle               | passed                     |
-| Google Meet, 4 участника         | Здоровый раздельный PCM на целевом маршруте   | route-level passed         |
-| Zoom/Teams/Meet                  | Separate target-app matrix                    | deferred to TEST-AUDIO-002 |
+| Experiment                       | Expected evidence                                            | Status                       |
+| -------------------------------- | ------------------------------------------------------------ | ---------------------------- |
+| Supported Electron clean install | Locked dependency graph                                      | passed                       |
+| Local quality and package        | Green gates, arm64 `.app`                                    | passed                       |
+| Packaged launch                  | Stable process and bundle metadata                           | passed                       |
+| Microphone-only fixture          | Nonzero mic frames, zero system contamination                | pending                      |
+| System playback fixture          | Nonzero system frames and energy                             | passed                       |
+| Silence/dead stream              | Explicit `dead` state                                        | pending                      |
+| Ten Start/Stop cycles            | No late frames or leaked tracks                              | passed                       |
+| Permission denied                | Explicit channel-specific failure                            | pending                      |
+| Built-in output                  | Healthy system stream                                        | pending                      |
+| Bluetooth output                 | Route result recorded                                        | passed                       |
+| USB mic + Bluetooth output       | Separate live PCM and lifecycle                              | passed                       |
+| Google Meet, 4 участника         | Здоровый system PCM; app device settings recorded separately | partial: system audio passed |
+| Zoom/Teams/Meet                  | Separate target-app matrix                                   | deferred to TEST-AUDIO-002   |
 
 ## Evidence log
 
@@ -182,7 +182,10 @@ required?
 
 - Google Meet оставался активным с четырьмя участниками. Probe не взаимодействовал с
   meeting controls, чатом, демонстрацией, состоянием микрофона или камеры.
-- Целевой маршрут: HyperX SoloCast USB input 48 kHz и `.Sony` Bluetooth output 44.1 kHz.
+- macOS default и cue effective route: HyperX SoloCast USB input 48 kHz и `.Sony` Bluetooth
+  output 44.1 kHz.
+- Input/output, выбранные внутри Google Meet, не были зафиксированы. Поэтому они имеют статус
+  `unknown` и не выводятся из macOS defaults или cue track labels.
 - После активации обоих worklet новое 12-секундное окно измерения записало 1501 message и
   192128 PCM16 sample на каждом канале.
 - `System audio`: RMS `4595`, peak `32767`, 189551 nonzero sample. Microphone: RMS `71`, peak
@@ -193,8 +196,9 @@ required?
 - Оба AudioContext перешли в `closed`; 2.2-секундное post-Stop наблюдение дало delta `[0, 0]`.
 - Инструментация сохраняла только labels и агрегированные counters; речь встречи и raw audio
   не сохранялись, не отображались и не передавались.
-- Это route-level evidence для Google Meet. Оно не закрывает STT, diarization, Zoom, Teams или
-  полную application matrix.
+- Это evidence здорового system-audio capture во время Google Meet и cue microphone capture.
+  Оно не подтверждает согласованность с внутренними device settings Meet и не закрывает STT,
+  diarization, Zoom, Teams или полную application matrix.
 
 ### 2026-07-27 - packaged identity и TCC
 
@@ -214,8 +218,9 @@ required?
 No architecture decision yet. The inherited Electron 33 path is rejected as evidence. Electron
 43.2.0 passes dependency, quality, package, launch, separate live PCM, and single-cycle Stop
 gates. Bluetooth playback, ten sequential Start/Stop cycles, and the HyperX SoloCast USB
-input with Sony Bluetooth output route also pass. Google Meet с четырьмя участниками прошел
-route-level проверку на этой USB/Bluetooth комбинации. Следующие эксперименты должны покрыть
+input with Sony Bluetooth output route also pass. Google Meet с четырьмя участниками подтвердил
+system-audio capture, но meeting-app device settings не были записаны и остаются `unknown`.
+Следующие эксперименты должны покрыть
 deterministic microphone isolation, dead-stream detection, permission denial, built-in
 output, route switching, Zoom, Teams, transcript/diarization и стабильную packaged TCC
 identity.

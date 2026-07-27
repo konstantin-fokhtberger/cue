@@ -2,13 +2,13 @@
 
 ## Control
 
-| Field           | Value                                    |
-| --------------- | ---------------------------------------- |
-| Backlog ID      | SPIKE-AUDIO-001                          |
-| Requirement IDs | FR-AUDIO-001, 002, 003, 004, 006, 007    |
-| Status          | in progress                              |
-| Owner           | project maintainer                       |
-| Target revision | `spike/SPIKE-AUDIO-001-electron-capture` |
+| Field           | Value                                      |
+| --------------- | ------------------------------------------ |
+| Backlog ID      | SPIKE-AUDIO-001                            |
+| Requirement IDs | FR-AUDIO-001, 002, 003, 004, 006, 007, 008 |
+| Status          | in progress                                |
+| Owner           | project maintainer                         |
+| Target revision | `spike/SPIKE-AUDIO-001-electron-capture`   |
 
 ## Outcome
 
@@ -35,6 +35,7 @@ or introduces a native Swift helper.
   fixture.
 - The existing unsigned identity is sufficient for a spike but not for stable TCC operations
   or distribution.
+- macOS default devices do not prove which devices Zoom, Teams, or Meet selected internally.
 
 ## Scope
 
@@ -44,6 +45,8 @@ or introduces a native Swift helper.
 - Detect silent/dead tracks instead of reporting capture success on track creation alone.
 - Verify packaged arm64 launch on the target Mac.
 - Record permission, lifecycle, route, and failure evidence.
+- Record macOS defaults, meeting-app selections, and cue's requested/effective microphone as
+  separate route fields.
 
 ## Non-goals
 
@@ -81,18 +84,21 @@ or introduces a native Swift helper.
 7. Ten repeated Start/Stop cycles complete without a duplicate stream or accepted late frame.
 8. Permission denied and missing-track paths are explicit and testable.
 9. The spike report separates proven behavior from untested Zoom/Teams/Meet scenarios.
+10. Meeting-app device selections are never inferred from macOS defaults or cue track labels;
+    missing evidence is recorded as `unknown`.
 
 ## Failure modes
 
-| Failure                                | Expected behavior                            | Test ID                      |
-| -------------------------------------- | -------------------------------------------- | ---------------------------- |
-| Microphone permission denied           | Microphone channel fails independently       | CT-CAPTURE-MIC-DENIED-001    |
-| System-audio permission denied         | System channel reports permission failure    | CT-CAPTURE-SYSTEM-DENIED-001 |
-| Audio track exists but emits no frames | Health state becomes `dead`                  | CT-CAPTURE-DEAD-001          |
-| Stop races with media request          | Late stream is stopped and discarded         | CT-CAPTURE-STOP-RACE-001     |
-| Duplicate async Start                  | One in-flight system capture request         | CT-CAPTURE-SINGLE-FLIGHT-001 |
-| Audio route changes                    | Stream termination or recovery is observable | RT-MAC-ROUTE-001             |
-| Chromium/Electron regression           | Package or fixture test fails                | RT-MAC-ELECTRON-001          |
+| Failure                                | Expected behavior                                            | Test ID                      |
+| -------------------------------------- | ------------------------------------------------------------ | ---------------------------- |
+| Microphone permission denied           | Microphone channel fails independently                       | CT-CAPTURE-MIC-DENIED-001    |
+| System-audio permission denied         | System channel reports permission failure                    | CT-CAPTURE-SYSTEM-DENIED-001 |
+| Audio track exists but emits no frames | Health state becomes `dead`                                  | CT-CAPTURE-DEAD-001          |
+| Stop races with media request          | Late stream is stopped and discarded                         | CT-CAPTURE-STOP-RACE-001     |
+| Duplicate async Start                  | One in-flight system capture request                         | CT-CAPTURE-SINGLE-FLIGHT-001 |
+| Audio route changes                    | Stream termination or recovery is observable                 | RT-MAC-ROUTE-001             |
+| Meeting app overrides macOS defaults   | cue opens its explicit input and reports the effective track | RT-MAC-APP-OVERRIDE-001      |
+| Chromium/Electron regression           | Package or fixture test fails                                | RT-MAC-ELECTRON-001          |
 
 ## Test plan
 

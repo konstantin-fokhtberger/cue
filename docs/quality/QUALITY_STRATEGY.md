@@ -75,6 +75,9 @@ Equivalent, timeout, and technically unviable mutants must be documented individ
 - Provider request completes after session end.
 - Sleep/wake.
 - Audio route change.
+- macOS default input differs from the meeting-app input.
+- cue explicitly selects a non-default microphone and reports the effective device.
+- requested cue microphone disappears; no silent fallback to another input occurs.
 - Dead stream with active-looking track.
 - Repeated Start/Stop under randomized callback order.
 
@@ -109,11 +112,13 @@ The automated runner should:
 
 1. Start a deterministic local audio fixture.
 2. Start the packaged cue build with permissions already provisioned for the stable signed identity.
-3. Capture microphone and system channels.
-4. Compare received audio fingerprints and timestamps.
-5. Execute repeated Start/Stop cycles.
-6. Verify no frames are accepted after Stop.
-7. Run meeting-application scenarios where automation is technically stable.
+3. Record macOS defaults, meeting-app selections, cue requested input, and cue effective input
+   as independent evidence fields.
+4. Capture microphone and system channels.
+5. Compare received audio fingerprints and timestamps.
+6. Execute repeated Start/Stop cycles.
+7. Verify no frames are accepted after Stop.
+8. Run meeting-application scenarios where automation is technically stable.
 
 Permission dialogs themselves are not a reliable CI target. Permission-denied behavior is tested through injected adapters; the real runner verifies the already-provisioned signed application.
 

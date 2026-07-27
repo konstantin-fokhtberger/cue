@@ -44,6 +44,10 @@ Meeting infrastructure is the shared foundation for the interview profile. Codin
 - Suggestions are explicitly requested by the user in the first release.
 - A regular target route is a separate USB microphone with Bluetooth headphones; the
   currently accepted devices are HyperX SoloCast input and Sony Bluetooth output.
+- macOS defaults, meeting-application device selections, and cue's effective capture devices
+  are independent configuration layers. A test or UI must not infer one layer from another.
+- cue must allow an explicit microphone selection; the macOS default is only the fallback
+  when no cue-specific selection exists.
 - Raw audio is not persisted.
 - Transcript data exists only in memory for the active session.
 - OpenAI diarization is the default STT path; cross-provider fallback is disabled.
