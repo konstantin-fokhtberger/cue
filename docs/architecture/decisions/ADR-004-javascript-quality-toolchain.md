@@ -2,6 +2,7 @@
 
 - Status: Accepted
 - Date: 2026-07-24
+- Amended: 2026-07-27 - Playwright Electron E2E
 
 ## Context
 
@@ -28,6 +29,7 @@ Use:
 - ESLint 10 flat configuration.
 - Prettier for deterministic formatting.
 - TypeScript `checkJs` immediately for the enforced module set, followed by incremental TypeScript migration for new domain code.
+- Playwright 1.62 for Electron renderer and packaged-application E2E on macOS.
 
 Versions are pinned in `package-lock.json`.
 TypeScript is pinned to 6.0.3 because the tested Stryker 9.6 preprocessor is incompatible with TypeScript 7.
@@ -48,3 +50,5 @@ Temporary legacy exclusions are recorded in `docs/quality/LEGACY_COVERAGE_BASELI
 - Legacy runtime behavior must be characterized and extracted incrementally.
 - Mutation testing runs separately because it is more expensive than the normal pull-request gate.
 - Browser and macOS behavior still require E2E and real-device gates.
+- E2E fixtures must use isolated temporary `userData`, synthetic media, and no test-only
+  preload or production IPC command.

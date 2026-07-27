@@ -87,3 +87,6 @@ jobs:
 
       - name: Package and verify ad-hoc macOS application
         run: npm run pack:ci
+
+      - name: Run packaged Electron audio diagnostics E2E
+        run: npm run test:e2e:packaged

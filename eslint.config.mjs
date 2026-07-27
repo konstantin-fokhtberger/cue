@@ -44,6 +44,18 @@ export default [
     },
   },
   {
+    files: ['e2e/**/*.mjs'],
+    languageOptions: {
+      ecmaVersion: 'latest',
+      sourceType: 'module',
+      globals: {
+        ...globals.node,
+        ...globals.browser,
+      },
+    },
+    rules: commonRules,
+  },
+  {
     files: ['renderer/icons.js'],
     languageOptions: {
       ecmaVersion: 'latest',

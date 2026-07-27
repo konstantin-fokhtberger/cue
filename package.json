@@ -12,11 +12,13 @@
   "scripts": {
     "start": "electron .",
     "test": "vitest run",
+    "test:e2e": "node --test e2e/*.e2e.mjs",
+    "test:e2e:packaged": "CUE_E2E_PACKAGED=1 node --test e2e/*.e2e.mjs",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
     "test:mutation": "stryker run",
     "lint": "eslint . --max-warnings 0",
-    "format:check": "prettier --check \"AGENTS.md\" \".github/**/*.yml\" \"docs/**/*.md\" \"test/**/*.{js,mjs,ts}\" \"tools/**/*.mjs\" \"*.config.mjs\" \"*.json\"",
+    "format:check": "prettier --check \"AGENTS.md\" \".github/**/*.yml\" \"docs/**/*.md\" \"e2e/**/*.mjs\" \"test/**/*.{js,mjs,ts}\" \"tools/**/*.mjs\" \"*.config.mjs\" \"*.json\"",
     "typecheck": "tsc --noEmit",
     "validate:traceability": "node tools/validate-traceability.mjs",
     "audit:production": "npm audit --omit=dev --audit-level=high",
@@ -78,6 +80,7 @@
     "eslint": "10.7.0",
     "fast-check": "4.9.0",
     "globals": "17.7.0",
+    "playwright": "1.62.0",
     "prettier": "3.9.6",
     "typescript": "6.0.3",
     "vitest": "4.1.10"

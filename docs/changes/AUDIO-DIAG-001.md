@@ -6,7 +6,7 @@
 | --------------- | ------------------------------------------------------ |
 | Backlog ID      | AUDIO-DIAG-001                                         |
 | Requirement IDs | FR-AUDIO-001, FR-AUDIO-004, FR-AUDIO-008, FR-AUDIO-009 |
-| Status          | implemented; permission-denial E2E pending             |
+| Status          | implemented; CI pending                                |
 | Owner           | project maintainer                                     |
 | Target revision | after BUG-PKG-001                                      |
 
@@ -44,6 +44,11 @@
    exact выбранный cue sink.
 5. Закрытие Settings останавливает mic diagnostic и output tone.
 6. Смена input во время starting/active diagnostic выполняет последовательный Stop/Start.
+7. Electron E2E запускается только при exact `CUE_E2E=1`, использует отдельный absolute
+   `userData` directory и не читает пользовательский `cue-data.json`.
+8. Media mocks устанавливаются Playwright init script внутри renderer; preload API и
+   production IPC не получают test-only команд.
+9. Packaged E2E выполняется после `pack:ci` на GitHub-hosted macOS arm64 runner.
 
 ## Non-goals
 
@@ -51,6 +56,8 @@
 - Изменение macOS defaults или настроек Zoom, Teams, Google Meet.
 - Проверка remote/system-audio lane вместо отдельного system-capture diagnostic.
 - Постоянная запись или сохранение raw audio.
+- Автоматизация реального TCC prompt: permission-denied UX проверяется инъекцией адаптера,
+  а stable signed package отдельно проверяется с уже выданными разрешениями.
 
 ## Acceptance criteria
 
@@ -94,8 +101,8 @@
 
 ### Automated - 2026-07-27
 
-- `npm run quality`: 131 tests, 100% statements, branches, functions and lines.
-- `npm run test:mutation`: 775/775 mutants killed, mutation score 100%.
+- `npm run quality`: 139 tests, 100% statements, branches, functions and lines.
+- `npm run test:mutation`: 814/814 mutants killed, mutation score 100%.
 - `npm run pack:local`: stable `com.cue.overlay` team-signed arm64 package produced.
 - GitHub Actions run `30254447031`: `quality` and `package-macos-arm64` passed for
   implementation commit `8e43bb6`.
@@ -105,6 +112,16 @@
   disposal reuse the tested `BrowserPcmCapture` contract.
 - `CT-AUDIO-DIAG-SINK-001`: bounded tone graph, exact playback target, typed failures and
   complete cleanup.
+- `E2E-AUDIO-DIAG-001`: Playwright launched the real renderer with synthetic HyperX/Sony
+  devices, verified exact routes, healthy PCM, output tone and zero HTTP(S) requests.
+- `E2E-AUDIO-DIAG-DENY-001`: both source Electron and the team-signed package converted
+  an injected `NotAllowedError` into the typed local `permission-denied` UI state, made no
+  provider request and returned the control to idle.
+- E2E settings were isolated under a generated OS temporary directory. The runtime rejects
+  missing, relative, filesystem-root and non-temporary E2E data paths.
+- Packaged local E2E passed against `com.cue.overlay`, team `6VS347Y94Z`, with stable
+  designated-requirement SHA-256
+  `7860224d176c5e9c8edbfa97baacfbea5e8e571c9f224e265d7f5275c5848d7e`.
 
 ### Target Mac - 2026-07-27
 
@@ -127,5 +144,6 @@
   display a warning, and do not use it for echo-cancellation acceptance.
 - System-audio diagnostics require a separate flow because they cross the ScreenCaptureKit/
   CoreAudio Tap permission boundary.
-- The permission-denied path is contract-tested but still needs packaged UI evidence
-  (`E2E-AUDIO-DIAG-DENY-001`) before the backlog item can move to `done`.
+- Permission denial is injected at the media-adapter boundary; automating the real macOS
+  TCC prompt is intentionally excluded because it is not a deterministic CI target.
+- The backlog item moves to `done` only after the packaged E2E step passes in GitHub Actions.

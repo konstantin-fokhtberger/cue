@@ -19,7 +19,7 @@ The transition therefore enforces 100% coverage on the already isolated profile-
 | ---------------- | ------------------------------------------------------------------------------------------ | -------------------------------------------------------------- |
 | `main.js`        | Electron lifecycle, global mutable capture state, IPC, and provider calls are not isolated | Extract session, timeline, provider policy, and IPC validation |
 | `preload.js`     | Bridge behavior needs an Electron contract harness                                         | Implement SEC-IPC-001 contract tests                           |
-| `renderer/*.js`  | DOM and media APIs require browser/Electron harnesses                                      | Add Electron E2E and capture adapter boundaries                |
+| `renderer/*.js`  | DOM and media APIs require browser/Electron harnesses                                      | Expand Electron E2E; AUDIO-DIAG paths are packaged-E2E covered |
 | `src/llm.js`     | Provider SDKs and streaming callbacks are directly constructed                             | Extract LLM port and provider contracts                        |
 | `src/prompts.js` | Pure but currently coupled to the legacy transcript shape                                  | Move to core after session timeline contract                   |
 | `src/screen.js`  | Electron desktop capture is constructed directly                                           | Add screen adapter contract                                    |

@@ -36,6 +36,7 @@ Create an executable quality baseline that rejects uncovered new core logic, wea
 - ESLint flat configuration.
 - Prettier check.
 - TypeScript `checkJs`.
+- Playwright Electron E2E.
 - Package scripts and pinned dependencies.
 - Migration of the existing profile-context tests.
 - Explicit temporary legacy coverage baseline.
@@ -97,6 +98,7 @@ Create an executable quality baseline that rejects uncovered new core logic, wea
 ## Security and privacy
 
 - Development dependencies are pinned.
+- Playwright E2E uses synthetic fixtures and an isolated temporary settings directory.
 - No API key is required.
 - Fixtures contain synthetic text only.
 - Full and production-only audit results are reported separately.

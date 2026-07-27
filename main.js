@@ -1,5 +1,11 @@
 const DEBUG = false; // Set to false to disable debug logging
 const { app, BrowserWindow, ipcMain, globalShortcut, screen, session, desktopCapturer, shell } = require('electron');
+const { resolveE2eRuntime } = require('./src/core/e2e-runtime-policy.cjs');
+const e2eRuntime = resolveE2eRuntime({
+  enabled: process.env.CUE_E2E,
+  userDataDir: process.env.CUE_E2E_USER_DATA_DIR,
+});
+if (e2eRuntime.enabled) app.setPath('userData', e2eRuntime.userDataDir);
 const path = require('path');
 const store = require('./src/store');
 const { captureScreenshot } = require('./src/screen');
@@ -277,7 +283,7 @@ app.whenReady().then(() => {
   }, { useSystemPicker: false });
 
   createWindow();
-  registerShortcuts();
+  if (!e2eRuntime.enabled) registerShortcuts();
 
   app.on('activate', () => { if (BrowserWindow.getAllWindows().length === 0) createWindow(); });
 });
