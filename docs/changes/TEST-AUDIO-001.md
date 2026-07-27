@@ -39,6 +39,10 @@ devices, or Electron globals.
 - Add deterministic contract fixtures for graph wiring, PCM routing, permission denial,
   missing tracks, duplicate Start, and Stop races.
 - Add a bounded PCM buffer with deterministic overflow policy as a following slice.
+- Exercise the real Electron renderer boundary with deterministic microphone and system-audio
+  fixtures, including duplicate renderer Start requests.
+- Require a 100-cycle Start/Stop stress gate and late-resolution race gate in both source and
+  packaged E2E runs.
 
 ## Non-goals
 
@@ -76,6 +80,14 @@ devices, or Electron globals.
 8. Deterministic fake fixtures validate the complete Web Audio connection graph.
 9. The bounded-buffer slice never exceeds its accepted byte limit under arbitrary frames.
 10. Packaged microphone/system capture and the Bluetooth lifecycle regression remain green.
+11. One renderer Start transition creates exactly one microphone graph and one system graph,
+    even when UI and main-process state notifications request Start concurrently.
+12. One hundred sequential renderer Start/Stop cycles close every graph, stop every fixture
+    track, emit no PCM after Stop, and make no provider network request.
+13. If Stop wins while microphone and system media requests are pending, all late streams and
+    partial graphs are disposed and cannot publish post-Stop PCM.
+14. A deterministic initialization failure releases partial resources and a following Start
+    can create a healthy graph without relaunching the application.
 
 ## Failure modes
 
@@ -89,6 +101,10 @@ devices, or Electron globals.
 | AudioWorklet initialization fails | Partial graph is fully disposed           | CT-CAPTURE-INIT-FAIL-001     |
 | PCM arrives on each channel       | Configured sink receives the exact buffer | CT-CAPTURE-CHANNELS-001      |
 | Buffer exceeds byte limit         | Oldest complete data is dropped           | PT-AUDIO-BOUNDS-001          |
+| Renderer requests Start twice     | One graph exists per channel              | E2E-CAPTURE-UI-001           |
+| One hundred Start/Stop cycles     | No graph, track, or PCM leak              | STRESS-CAPTURE-100-001       |
+| Stop wins two pending requests    | Late resources are disposed               | E2E-CAPTURE-STOP-RACE-001    |
+| Initialization fails then retries | Retry succeeds without stale ownership    | E2E-CAPTURE-RECOVERY-001     |
 
 ## Test plan
 
@@ -99,8 +115,15 @@ devices, or Electron globals.
 | Mutation    | MT-CAPTURE-ADAPTER-001, MT-AUDIO-001             | Assertion strength           |
 | Contract    | CT-CAPTURE-DOUBLE-START-001 through CHANNELS-001 | Browser adapter behavior     |
 | Integration | IT-CAPTURE-FIXTURE-001                           | Worklet-to-channel routing   |
-| E2E         | E2E-CAPTURE-UI-001                               | Renderer Start/Stop          |
+| E2E         | E2E-CAPTURE-UI-001, STOP-RACE-001, RECOVERY-001  | Renderer lifecycle           |
+| Stress      | STRESS-CAPTURE-100-001                           | Repeated leak-free lifecycle |
 | Real device | RT-MAC-MIC-001, RT-MAC-STOP-001                  | Target-Mac regression        |
+
+The automated stress fixture is deliberately independent of the currently selected macOS
+input/output route. Each completed cycle must have exactly two created and closed audio
+contexts, two disconnected worklet nodes, and three stopped tracks: microphone audio, system
+audio, and the display video track discarded by the system-audio adapter. The fixture must
+observe zero provider requests and zero PCM callbacks after the cycle has reached Stop.
 
 ## Security and privacy
 
@@ -125,6 +148,9 @@ devices, or Electron globals.
 - Coverage: 56 tests pass; statements 196/196, branches 81/81, functions 46/46, and lines
   191/191.
 - Mutation: 307/307 mutants killed; mutation score 100%.
+- Current enforced suite: 140 tests pass; statements 413/413, branches 229/229, functions
+  89/89, and lines 405/405.
+- Current mutation gate: 814/814 mutants killed; mutation score 100%.
 - Performance: pending.
 - Contract: nine deterministic adapter tests cover graph wiring, exact channel routing,
   duplicate Start, active Stop, Stop-during-Start, typed permission denial, missing tracks,
@@ -139,10 +165,20 @@ devices, or Electron globals.
 - Package: Electron 43.2.0 arm64 directory package completes with the extracted adapter.
 - Buffer integration runtime: both IPC channels received 187 frames and 23936 samples in a
   packaged cycle; both contexts closed and post-Stop deltas were `[0, 0]`.
+- Property lifecycle: 500 generated sequences of up to 100 Start, duplicate Start, failed
+  Start, late Start/Stop, and Stop operations preserve single ownership and dispose every
+  created resource exactly once.
+- Source and packaged Electron E2E: all six scenarios pass, including local route diagnostics,
+  duplicate renderer Start coalescing, Stop-before-resolution cleanup, initialization-failure
+  recovery, and the 100-cycle stress gate.
+- Stress lifecycle: 100 microphone opens and 100 system opens create and close exactly 200
+  AudioContexts, disconnect 200 worklets, stop 300 fixture tracks, produce no post-Stop PCM,
+  and make no provider network requests.
 
 ## Residual risks and follow-up
 
 - Fake Web Audio contracts cannot prove Chromium or CoreAudio behavior.
 - Main-process IPC validation remains `SEC-IPC-001`.
 - Overflow metrics are not yet emitted through the telemetry port.
-- Electron E2E and the 100-cycle automated stress gate remain open within this backlog item.
+- Zoom, Teams, Meet, TCC, and real route-switch automation remain in `TEST-AUDIO-002` and the
+  target-Mac CI lane.
