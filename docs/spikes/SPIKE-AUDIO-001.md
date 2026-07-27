@@ -62,6 +62,7 @@ required?
 | Built-in output                  | Healthy system stream                         | pending                    |
 | Bluetooth output                 | Route result recorded                         | passed                     |
 | USB mic + Bluetooth output       | Separate live PCM and lifecycle               | passed                     |
+| Google Meet, 4 участника         | Здоровый раздельный PCM на целевом маршруте   | route-level passed         |
 | Zoom/Teams/Meet                  | Separate target-app matrix                    | deferred to TEST-AUDIO-002 |
 
 ## Evidence log
@@ -177,11 +178,44 @@ required?
 - Instrumentation retained labels and aggregate counters only; no raw audio was persisted or
   transmitted.
 
+### 2026-07-27 - активный Google Meet с четырьмя участниками
+
+- Google Meet оставался активным с четырьмя участниками. Probe не взаимодействовал с
+  meeting controls, чатом, демонстрацией, состоянием микрофона или камеры.
+- Целевой маршрут: HyperX SoloCast USB input 48 kHz и `.Sony` Bluetooth output 44.1 kHz.
+- После активации обоих worklet новое 12-секундное окно измерения записало 1501 message и
+  192128 PCM16 sample на каждом канале.
+- `System audio`: RMS `4595`, peak `32767`, 189551 nonzero sample. Microphone: RMS `71`, peak
+  `676`, 187493 nonzero sample.
+- Корреляция двенадцати односекундных RMS buckets составила `-0.478`. Это исключает простое
+  дублирование каналов в данном наблюдении, но не сертифицирует acoustic crosstalk или
+  точность transcript.
+- Оба AudioContext перешли в `closed`; 2.2-секундное post-Stop наблюдение дало delta `[0, 0]`.
+- Инструментация сохраняла только labels и агрегированные counters; речь встречи и raw audio
+  не сохранялись, не отображались и не передавались.
+- Это route-level evidence для Google Meet. Оно не закрывает STT, diarization, Zoom, Teams или
+  полную application matrix.
+
+### 2026-07-27 - packaged identity и TCC
+
+- electron-builder output использовал bundle ID `com.cue.overlay` в Info.plist, но ad-hoc
+  signing identifier исполняемого файла был `Electron`; Info.plist не был связан с подписью.
+- Новая сборка изменила CDHash и инвалидировала ранее выданную TCC identity. macOS вернул
+  `screenAccess: denied`, `desktopCapturer.getSources()` не вернул источников, а renderer
+  capture завершился `AbortError: Invalid capture constraints`.
+- Явная переподпись уже собранного bundle с identifier `com.cue.overlay`, добавление именно
+  этого bundle в Screen & System Audio Recording и перезапуск дали `screenAccess: granted` и
+  два screen source.
+- Workaround применен только для probe. `BUG-PKG-001` должен обеспечить воспроизводимую
+  тестовую identity, а `PKG-001` - signed/notarized distribution identity.
+
 ## Preliminary conclusion
 
 No architecture decision yet. The inherited Electron 33 path is rejected as evidence. Electron
 43.2.0 passes dependency, quality, package, launch, separate live PCM, and single-cycle Stop
 gates. Bluetooth playback, ten sequential Start/Stop cycles, and the HyperX SoloCast USB
-input with Sony Bluetooth output route also pass. The next experiments must cover
+input with Sony Bluetooth output route also pass. Google Meet с четырьмя участниками прошел
+route-level проверку на этой USB/Bluetooth комбинации. Следующие эксперименты должны покрыть
 deterministic microphone isolation, dead-stream detection, permission denial, built-in
-output, route switching, and the full target meeting-application matrix.
+output, route switching, Zoom, Teams, transcript/diarization и стабильную packaged TCC
+identity.

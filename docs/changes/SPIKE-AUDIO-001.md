@@ -143,6 +143,11 @@ or introduces a native Swift helper.
   microphone/system PCM during browser playback. Microphone RMS/peak were `4726`/`32768`;
   system RMS/peak were `2368`/`31642`; 12-bucket RMS correlation was `-0.501`. Both contexts
   closed and post-Stop message deltas were `[0, 0]`.
+- Google Meet: активная встреча с четырьмя участниками на маршруте HyperX SoloCast USB input и
+  `.Sony` Bluetooth output дала 1501 frame и 192128 sample на каждом канале за измеренное
+  12-секундное окно. System RMS/peak составили `4595`/`32767`, microphone RMS/peak -
+  `71`/`676`, корреляция bucket RMS - `-0.478`. Оба context закрылись, post-Stop message delta
+  составили `[0, 0]`.
 - Package: Electron 43.2.0 and electron-builder 26.15.3 produce an arm64 app containing the
   expected bundle identifier and audio-capture usage description.
 
@@ -150,6 +155,9 @@ or introduces a native Swift helper.
 
 - GitHub-hosted M1 packaging cannot prove M2/TCC behavior.
 - Unsigned development builds can produce unstable permission identity.
+- Стандартный unsigned package имел signing identifier `Electron`, а не `com.cue.overlay`;
+  новая сборка инвалидировала TCC grant. Явная ad-hoc переподпись восстановила ожидаемый
+  identifier для этого probe, но не является решением для дистрибуции (`BUG-PKG-001`).
 - Mixed system audio does not itself identify 1-8 remote speakers.
 - Built-in output, route switching, sleep/wake, and meeting-app behavior for every accepted
   route remain separate matrix dimensions.
