@@ -1,4 +1,15 @@
 import { BrowserPcmCapture } from '../src/core/browser-pcm-capture.mjs';
+import { BrowserOutputTone } from '../src/core/browser-output-tone.mjs';
+import {
+  AUDIO_DIAGNOSTIC_DEFAULTS,
+  activateAudioDiagnostic,
+  beginAudioDiagnostic,
+  createAudioDiagnosticState,
+  describeAudioDiagnostic,
+  failAudioDiagnostic,
+  recordAudioDiagnosticPcm,
+  stopAudioDiagnostic,
+} from '../src/core/audio-diagnostic-policy.mjs';
 import {
   applyOutputSelection,
   buildAudioDeviceOptions,
@@ -41,6 +52,11 @@ import {
   let availableInputIds = new Set(['default']);
   let availableOutputLabels = new Map([['default', 'system default']]);
   const cuePlayback = new Audio();
+  let diagnosticState = createAudioDiagnosticState();
+  let diagnosticGeneration = 0;
+  let diagnosticHealthTimer = null;
+  let diagnosticAutoStopTimer = null;
+  let diagnosticTransition = Promise.resolve();
 
   const messages = $('#messages');
 
@@ -228,6 +244,28 @@ import {
     onPcm: (pcm) => cue.systemPcm(pcm),
   });
 
+  const microphoneDiagnosticCapture = new BrowserPcmCapture({
+    ...browserAudioDependencies,
+    channel: 'microphone-diagnostic',
+    openStream: () => navigator.mediaDevices.getUserMedia(
+      buildMicrophoneConstraints(currentAudioDeviceId('inputId')),
+    ),
+    onStarted: () => cue.log('microphone diagnostic: capturing locally'),
+    onPcm: (pcm) => {
+      diagnosticState = recordAudioDiagnosticPcm(diagnosticState, pcm);
+    },
+  });
+
+  const outputDiagnosticTone = new BrowserOutputTone({
+    target: cuePlayback,
+    createAudioContext: () => new AudioContext(),
+    setTimeoutFn: (callback, delay) => setTimeout(callback, delay),
+    clearTimeoutFn: (timer) => clearTimeout(timer),
+    durationMs: AUDIO_DIAGNOSTIC_DEFAULTS.toneDurationMs,
+    frequencyHz: AUDIO_DIAGNOSTIC_DEFAULTS.toneFrequencyHz,
+    gainValue: AUDIO_DIAGNOSTIC_DEFAULTS.toneGain,
+  });
+
   function startCapture(capture, label) {
     return capture.start().catch((error) => {
       cue.log(label + ' audio error: ' + (error && error.message));
@@ -299,7 +337,13 @@ import {
     scrim.classList.remove('hidden');
     refreshAudioDevices();
   }
-  function closeSettings() { cancelShortcutRecording(); saveSettings(); scrim.classList.add('hidden'); }
+  async function closeSettings() {
+    cancelShortcutRecording();
+    await queueDiagnosticTransition(stopMicrophoneDiagnostic);
+    await outputDiagnosticTone.stop();
+    await saveSettings();
+    scrim.classList.add('hidden');
+  }
   $('#more-btn').addEventListener('click', openSettings);
   $('#s-close').addEventListener('click', closeSettings);
   scrim.addEventListener('click', (e) => { if (e.target === scrim) closeSettings(); });
@@ -411,6 +455,152 @@ import {
     }
   }
 
+  function diagnosticIsRunning() {
+    return diagnosticState.phase === 'starting' || diagnosticState.phase === 'active';
+  }
+
+  function clearDiagnosticTimers() {
+    clearInterval(diagnosticHealthTimer);
+    clearTimeout(diagnosticAutoStopTimer);
+    diagnosticHealthTimer = null;
+    diagnosticAutoStopTimer = null;
+  }
+
+  function diagnosticHealthLabel(status) {
+    return {
+      waiting: 'Waiting for PCM frames',
+      dead: 'No PCM frames received',
+      silent: 'Frames received, signal is silent',
+      healthy: 'Signal detected',
+      idle: 'Idle',
+    }[status] || status;
+  }
+
+  function renderMicrophoneDiagnostic() {
+    const snapshot = describeAudioDiagnostic(diagnosticState, Date.now());
+    const button = $('#audio-test-input');
+    const status = $('#audio-diagnostic-status');
+    const running = diagnosticIsRunning();
+    button.textContent = running ? 'Stop microphone test' : 'Test selected microphone';
+    button.classList.toggle('active', running);
+
+    if (snapshot.phase === 'idle' && snapshot.frameCount === 0) {
+      status.textContent = 'Not running. No audio leaves cue.';
+      status.className = 's-diagnostic-status';
+      return;
+    }
+
+    if (snapshot.phase === 'error') {
+      status.textContent = 'Microphone test failed: ' + snapshot.errorCode;
+      status.className = 's-diagnostic-status error';
+      return;
+    }
+
+    const prefix = snapshot.phase === 'idle' ? 'Stopped' : diagnosticHealthLabel(snapshot.healthStatus);
+    const inputLabel = snapshot.effectiveInput
+      ? ' · input: ' + snapshot.effectiveInput.effectiveLabel
+      : '';
+    status.textContent =
+      prefix +
+      inputLabel +
+      ' · RMS ' +
+      Math.round(snapshot.rms) +
+      ' · peak ' +
+      snapshot.peak +
+      ' · frames ' +
+      snapshot.frameCount;
+    status.className =
+      's-diagnostic-status ' +
+      (snapshot.healthStatus === 'healthy'
+        ? 'success'
+        : snapshot.healthStatus === 'dead'
+          ? 'error'
+          : '');
+  }
+
+  function queueDiagnosticTransition(operation) {
+    diagnosticTransition = diagnosticTransition.then(operation, operation);
+    return diagnosticTransition;
+  }
+
+  async function startMicrophoneDiagnostic() {
+    if (diagnosticIsRunning()) return;
+    const generation = ++diagnosticGeneration;
+    diagnosticState = beginAudioDiagnostic(diagnosticState, Date.now());
+    renderMicrophoneDiagnostic();
+
+    let resource;
+    try {
+      resource = await microphoneDiagnosticCapture.start();
+    } catch (error) {
+      if (generation !== diagnosticGeneration) return;
+      diagnosticState = failAudioDiagnostic(
+        diagnosticState,
+        error && error.code ? error.code : 'initialization-failed',
+        Date.now(),
+      );
+      renderMicrophoneDiagnostic();
+      return;
+    }
+    if (!resource || generation !== diagnosticGeneration) return;
+
+    const track = resource.stream.getAudioTracks()[0];
+    diagnosticState = activateAudioDiagnostic(
+      diagnosticState,
+      describeEffectiveInput(track, currentAudioDeviceId('inputId')),
+    );
+    renderMicrophoneDiagnostic();
+    diagnosticHealthTimer = setInterval(
+      renderMicrophoneDiagnostic,
+      AUDIO_DIAGNOSTIC_DEFAULTS.healthTickMs,
+    );
+    diagnosticAutoStopTimer = setTimeout(
+      () => queueDiagnosticTransition(stopMicrophoneDiagnostic),
+      AUDIO_DIAGNOSTIC_DEFAULTS.autoStopMs,
+    );
+  }
+
+  async function stopMicrophoneDiagnostic() {
+    if (!diagnosticIsRunning() && !microphoneDiagnosticCapture.active) return;
+    diagnosticGeneration += 1;
+    clearDiagnosticTimers();
+    await microphoneDiagnosticCapture.stop();
+    diagnosticState = stopAudioDiagnostic(diagnosticState, Date.now());
+    renderMicrophoneDiagnostic();
+  }
+
+  async function testSelectedOutput() {
+    const button = $('#audio-test-output');
+    const status = $('#audio-output-diagnostic-status');
+    button.disabled = true;
+    status.textContent = 'Preparing selected cue output…';
+    status.className = 's-diagnostic-status';
+    try {
+      if (!(await applyCueOutput())) {
+        status.textContent = 'Output test failed: selected sink is unavailable.';
+        status.className = 's-diagnostic-status error';
+        return;
+      }
+      await outputDiagnosticTone.start();
+      status.textContent = '440 Hz test tone sent to the selected cue output for 500 ms.';
+      status.className = 's-diagnostic-status success';
+    } catch (error) {
+      status.textContent =
+        'Output test failed: ' +
+        (error && error.code ? error.code : 'playback-failed');
+      status.className = 's-diagnostic-status error';
+    } finally {
+      button.disabled = false;
+    }
+  }
+
+  $('#audio-test-input').addEventListener('click', () => {
+    queueDiagnosticTransition(
+      diagnosticIsRunning() ? stopMicrophoneDiagnostic : startMicrophoneDiagnostic,
+    );
+  });
+  $('#audio-test-output').addEventListener('click', testSelectedOutput);
+
   async function applyCueOutput() {
     const requestedId = currentAudioDeviceId('outputId');
     try {
@@ -475,12 +665,19 @@ import {
   }
 
   $('#audio-input').addEventListener('change', async (event) => {
+    const restartDiagnostic = diagnosticIsRunning();
     await saveAudioDeviceSelection('inputId', event.target.value);
     effectiveInput = null;
     syncAudioDeviceStatus();
     if (captureActive) {
       await microphoneCapture.stop();
       await startMic();
+    }
+    if (restartDiagnostic) {
+      await queueDiagnosticTransition(async () => {
+        await stopMicrophoneDiagnostic();
+        await startMicrophoneDiagnostic();
+      });
     }
     await refreshAudioDevices();
   });
@@ -703,6 +900,7 @@ import {
     $('#stop-btn').classList.toggle('active', st.active);
     if (!settings.onboarded) showOnboard();
     await refreshAudioDevices();
+    renderMicrophoneDiagnostic();
 
   })();
 })();

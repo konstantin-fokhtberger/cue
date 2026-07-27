@@ -35,7 +35,7 @@
 | BUG-AUDIO-001     | EPIC-002 |       P0 | done     | Prevent duplicate concurrent system-audio start                      | SPIKE-AUDIO-001                           |
 | ADR-DEVICE-001    | EPIC-002 |       P0 | done     | Accept cue input/output selection and fallback policy                | SPIKE-AUDIO-001                           |
 | AUDIO-DEVICE-001  | EPIC-002 |       P0 | active   | Explicit cue input/output selectors and effective-device diagnostics | ADR-DEVICE-001, TEST-AUDIO-001            |
-| AUDIO-DIAG-001    | EPIC-002 |       P0 | proposed | Local provider-free microphone/output diagnostics                    | AUDIO-DEVICE-001, TEST-AUDIO-001          |
+| AUDIO-DIAG-001    | EPIC-002 |       P0 | active   | Local provider-free microphone/output diagnostics                    | AUDIO-DEVICE-001, TEST-AUDIO-001          |
 | BUG-PKG-001       | EPIC-006 |       P0 | done     | Стабилизировать identity `com.cue.overlay` в тестовых macOS-пакетах  | SPIKE-AUDIO-001                           |
 | TEST-AUDIO-001    | EPIC-002 |       P0 | active   | Capture adapter contract suite and deterministic audio fixtures      | TOOL-001                                  |
 | TEST-AUDIO-002    | EPIC-002 |       P0 | proposed | Zoom/Teams/Meet x accepted audio-route automation matrix             | SPIKE-AUDIO-001, AUDIO-DEVICE-001, CI-002 |

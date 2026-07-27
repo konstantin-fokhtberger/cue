@@ -87,6 +87,16 @@
         <div class="s-field s-device"><span>Output</span><select id="audio-output"></select></div>
         <div class="s-device-status" id="audio-output-effective"></div>
         <div class="s-device-note">Meeting input/output must still be selected separately in Zoom, Teams, or Meet. cue output affects cue-owned playback only, not system-audio capture.</div>
+        <div class="s-diagnostic">
+          <div class="s-diagnostic-title">Local audio diagnostics <span class="s-hint">no API key or provider</span></div>
+          <div class="s-diagnostic-actions">
+            <button id="audio-test-input" type="button">Test selected microphone</button>
+            <button id="audio-test-output" type="button">Test selected output</button>
+          </div>
+          <div class="s-diagnostic-status" id="audio-diagnostic-status">Not running. No audio leaves cue.</div>
+          <div class="s-diagnostic-status" id="audio-output-diagnostic-status">The output test plays a short low-volume tone.</div>
+          <div class="s-device-note s-diagnostic-note">Microphone PCM is sampled only in memory and automatically stops after 10 seconds. A test tone can re-enter an open microphone.</div>
+        </div>
 
         <label class="s-label">Keyboard shortcuts</label>
         <div class="s-shortcut">
