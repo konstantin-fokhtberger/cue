@@ -78,10 +78,14 @@ Teams и Google Meet. Пользователь должен явно видет�
   failure, and effective-sink mismatch.
 - Browser capture contract classifies `NotFoundError` and `OverconstrainedError` as
   `device-unavailable`; exact input selection therefore cannot silently degrade to default.
-- Full automated scope: 86 tests, 100% statements/branches/functions/lines, 462/462 mutants
-  killed.
+- Full automated scope after signing-policy work: 100% statements/branches/functions/lines
+  and 636/636 mutants killed.
 - Development Electron UI smoke test displayed independent Input and Output selectors,
   requested/effective status, and the explicit warning that meeting-app devices are separate.
-- Development Electron had only its TCC-limited `System default` entries. Exact HyperX/Sony
-  target-device selection and controlled live restart remain open real-device evidence and
-  must not be marked verified from this smoke test.
+- Stable team-signed target package enumerated the real CoreAudio inventory. Explicit HyperX
+  input and built-in output selection passed, and both selections persisted across a full app
+  restart.
+- Live HyperX stream/restart evidence remains open because the current Listen flow rejects
+  the request before capture when no transcription key is configured.
+- Sony was absent from both CoreAudio inventory and cue during this run. Exact Sony output
+  selection therefore remains open and must not be inferred from older evidence.
