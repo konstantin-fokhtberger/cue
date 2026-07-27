@@ -1,6 +1,6 @@
-# ADR-005: independent cue microphone selection
+# ADR-005: independent cue input and output selection
 
-- Status: Proposed
+- Status: Accepted
 - Date: 2026-07-27
 
 ## Context
@@ -23,14 +23,16 @@ SoloCast input и Sony output. Вызов cue без точного `deviceId` �
 | Пытаться автоматически читать настройки meeting app | Возможное автоматическое согласование                           | Нет стабильного общего API, высокая связность, хрупкая автоматизация и privacy risk |
 | Собственный cue selector с явным fallback           | Детерминированный выбор, прозрачно для пользователя, тестируемо | Дополнительный UI, device lifecycle и recovery logic                                |
 
-## Proposed decision
+## Decision
 
-Использовать собственный selector микрофона cue:
+Использовать собственные input и playback-output selectors cue:
 
-- точный cue selection имеет приоритет;
+- точный cue input/output selection имеет приоритет;
 - macOS default применяется только при отсутствии cue selection;
-- UI и диагностика показывают requested и effective device;
+- UI и диагностика показывают requested и effective input/output;
 - недоступный requested device не заменяется другим input молча;
+- output selector маршрутизирует только cue-owned playback и не изменяет output в
+  Zoom/Teams/Meet;
 - настройки meeting-приложения не считаются доступными через capture contract и фиксируются
   как отдельное test evidence.
 
@@ -38,6 +40,8 @@ SoloCast input и Sony output. Вызов cue без точного `deviceId` �
 
 - `MicrophoneCapturePort` принимает explicit device selection вместо неявного default-only
   поведения.
+- cue-owned playback использует один output routing boundary; сейчас у cue нет обязательного
+  audible playback, но sink должен быть готов для последующих функций.
 - Device disappearance и смена selection проходят через session lifecycle и generation
   cancellation.
 - Для Zoom/Teams/Meet real-device matrix требуется два варианта: aligned и app override.

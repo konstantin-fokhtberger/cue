@@ -33,6 +33,7 @@
 | FR-AUDIO-006 |       P1 | accepted | Bluetooth and built-in audio routes are supported on the target Mac | The accepted device matrix passes                                                                                                                                                                                   |
 | FR-AUDIO-007 |       P1 | accepted | A separate USB microphone works with Bluetooth output               | HyperX SoloCast input and Sony Bluetooth output retain separate microphone/system PCM and pass the accepted meeting-app matrix                                                                                      |
 | FR-AUDIO-008 |       P0 | accepted | cue selects and reports its microphone independently                | With macOS default input set to Sony and the meeting app set to HyperX, cue can explicitly open HyperX and reports the effective device; without an explicit selection, the displayed fallback is the macOS default |
+| FR-AUDIO-009 |       P0 | accepted | cue selects and reports its playback output independently           | cue applies the exact selected output sink to cue-owned playback, displays requested/effective output, and states that meeting-app output must be selected separately                                               |
 
 ### Transcription and diarization
 
@@ -121,6 +122,7 @@ Every real-device result records these fields independently:
 - macOS default input and output;
 - meeting-app selected input and output;
 - cue requested microphone and cue effective microphone track;
+- cue requested playback output and cue effective playback sink;
 - effective system-audio track;
 - whether each value was observed automatically, verified manually, or remains unknown.
 

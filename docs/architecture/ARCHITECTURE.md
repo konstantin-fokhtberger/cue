@@ -37,20 +37,20 @@ The current monolith should be migrated by vertical slices. A full rewrite is no
 
 ## 4. Component model
 
-| Component                | Responsibility                                                          | Must not own                         |
-| ------------------------ | ----------------------------------------------------------------------- | ------------------------------------ |
-| `SessionController`      | Session state machine, generation token, cancellation, lifecycle events | Electron UI, provider SDK details    |
-| `MicrophoneCapturePort`  | Local-user PCM stream                                                   | STT selection or transcript state    |
-| `AudioDevicePolicy`      | cue microphone selection, default fallback, effective-device reporting  | Reading private meeting-app settings |
-| `SystemAudioCapturePort` | Mixed remote PCM stream and health status                               | Speaker identity or prompts          |
-| `AudioPipeline`          | Format normalization, bounded buffering, VAD, backpressure              | Provider fallback policy             |
-| `RealtimeTranscription`  | Low-latency partial/final text                                          | Long-term speaker identity           |
-| `DiarizationPipeline`    | Stable session-scoped remote speaker labels                             | Microphone speaker classification    |
-| `ConversationTimeline`   | Ordered immutable transcript segments and corrections                   | UI rendering                         |
-| `ProviderPolicy`         | Selected provider, consented fallback, attachment rules                 | Provider SDK transport               |
-| `CopilotEngine`          | Meeting, interview, and coding use cases                                | Capture lifecycle                    |
-| `CredentialStore`        | macOS Keychain access                                                   | Renderer-visible secret values       |
-| `TelemetryPort`          | Sanitized local diagnostics and metrics                                 | Raw audio, keys, transcript text     |
+| Component                | Responsibility                                                           | Must not own                             |
+| ------------------------ | ------------------------------------------------------------------------ | ---------------------------------------- |
+| `SessionController`      | Session state machine, generation token, cancellation, lifecycle events  | Electron UI, provider SDK details        |
+| `MicrophoneCapturePort`  | Local-user PCM stream                                                    | STT selection or transcript state        |
+| `AudioDevicePolicy`      | cue input/output selection, default fallback, effective-device reporting | Reading or changing meeting-app settings |
+| `SystemAudioCapturePort` | Mixed remote PCM stream and health status                                | Speaker identity or prompts              |
+| `AudioPipeline`          | Format normalization, bounded buffering, VAD, backpressure               | Provider fallback policy                 |
+| `RealtimeTranscription`  | Low-latency partial/final text                                           | Long-term speaker identity               |
+| `DiarizationPipeline`    | Stable session-scoped remote speaker labels                              | Microphone speaker classification        |
+| `ConversationTimeline`   | Ordered immutable transcript segments and corrections                    | UI rendering                             |
+| `ProviderPolicy`         | Selected provider, consented fallback, attachment rules                  | Provider SDK transport                   |
+| `CopilotEngine`          | Meeting, interview, and coding use cases                                 | Capture lifecycle                        |
+| `CredentialStore`        | macOS Keychain access                                                    | Renderer-visible secret values           |
+| `TelemetryPort`          | Sanitized local diagnostics and metrics                                  | Raw audio, keys, transcript text         |
 
 ## 5. Session state machine
 
