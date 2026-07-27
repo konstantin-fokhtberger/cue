@@ -6,7 +6,7 @@
 | --------------- | ------------------------------------------------------ |
 | Backlog ID      | AUDIO-DIAG-001                                         |
 | Requirement IDs | FR-AUDIO-001, FR-AUDIO-004, FR-AUDIO-008, FR-AUDIO-009 |
-| Status          | implemented; CI pending                                |
+| Status          | verified                                               |
 | Owner           | project maintainer                                     |
 | Target revision | after BUG-PKG-001                                      |
 
@@ -106,6 +106,8 @@
 - `npm run pack:local`: stable `com.cue.overlay` team-signed arm64 package produced.
 - GitHub Actions run `30254447031`: `quality` and `package-macos-arm64` passed for
   implementation commit `8e43bb6`.
+- GitHub Actions run `30255830958`: `quality`, arm64 packaging and the new packaged
+  Electron E2E step passed for commit `35311c2`.
 - `UT-AUDIO-DIAG-STATE-001`: deterministic state, health, timeout and malformed-frame
   behavior.
 - `CT-AUDIO-DIAG-001`: local PCM graph isolation, late-start cancellation and complete
@@ -146,4 +148,5 @@
   CoreAudio Tap permission boundary.
 - Permission denial is injected at the media-adapter boundary; automating the real macOS
   TCC prompt is intentionally excluded because it is not a deterministic CI target.
-- The backlog item moves to `done` only after the packaged E2E step passes in GitHub Actions.
+- Real TCC prompt automation remains intentionally out of scope; injected denial plus
+  stable-identity target-Mac evidence are the accepted deterministic controls.
