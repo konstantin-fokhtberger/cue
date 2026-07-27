@@ -28,21 +28,44 @@ const sourceExecutable = path.join(
   'Electron',
 );
 
-function audioFixtureScript({ microphoneMode }) {
+function audioFixtureScript({ captureMode, microphoneMode, workletFailures }) {
   const state = {
     microphoneMode,
     openedInputIds: [],
+    microphoneOpenCount: 0,
+    systemOpenCount: 0,
     stoppedTrackCount: 0,
+    trackStopCallCount: 0,
+    createdContextCount: 0,
+    closedContextCount: 0,
+    contextCloseCallCount: 0,
+    createdWorkletCount: 0,
+    disconnectedWorkletCount: 0,
+    workletDisconnectCallCount: 0,
+    activeWorkletCount: 0,
+    deliveredPcmCount: 0,
+    postStopPcmCount: 0,
+    pendingMediaRequestCount: 0,
     outputSinkIds: [],
     outputPlayCount: 0,
+    failWorkletInitialization: workletFailures === 'until-released',
+    workletFailuresRemaining: workletFailures,
   };
   Object.defineProperty(window, '__cueE2eAudio', { value: state });
+  const pendingMediaResolvers = [];
+  state.resolvePendingMediaRequests = () => {
+    for (const resolve of pendingMediaResolvers.splice(0)) resolve();
+  };
+  state.allowWorkletInitialization = () => {
+    state.failWorkletInitialization = false;
+  };
 
   class FixtureTrack {
-    constructor(deviceId, label) {
-      this.kind = 'audio';
+    constructor(kind, deviceId, label) {
+      this.kind = kind;
       this.label = label;
       this.deviceId = deviceId;
+      this.stopped = false;
     }
 
     getSettings() {
@@ -50,6 +73,9 @@ function audioFixtureScript({ microphoneMode }) {
     }
 
     stop() {
+      state.trackStopCallCount += 1;
+      if (this.stopped) return;
+      this.stopped = true;
       state.stoppedTrackCount += 1;
     }
   }
@@ -67,19 +93,41 @@ function audioFixtureScript({ microphoneMode }) {
       return this.tracks.filter((track) => track.kind === 'audio');
     }
 
+    getVideoTracks() {
+      return this.tracks.filter((track) => track.kind === 'video');
+    }
+
     removeTrack(track) {
       this.tracks = this.tracks.filter((candidate) => candidate !== track);
     }
   }
 
-  const node = () => ({
-    connect() {},
-    disconnect() {},
-  });
+  function node() {
+    let disconnected = false;
+    return {
+      connect() {},
+      disconnect() {
+        if (disconnected) return;
+        disconnected = true;
+      },
+    };
+  }
 
   class FixtureAudioContext {
     constructor() {
-      this.audioWorklet = { addModule: async () => {} };
+      state.createdContextCount += 1;
+      this.closed = false;
+      this.audioWorklet = {
+        addModule: async () => {
+          if (state.failWorkletInitialization) {
+            throw new Error('fixture worklet initialization failed');
+          }
+          if (state.workletFailuresRemaining > 0) {
+            state.workletFailuresRemaining -= 1;
+            throw new Error('fixture worklet initialization failed');
+          }
+        },
+      };
       this.destination = {};
     }
 
@@ -104,14 +152,27 @@ function audioFixtureScript({ microphoneMode }) {
       return { stream: new FixtureStream([]) };
     }
 
-    async close() {}
+    async close() {
+      state.contextCloseCallCount += 1;
+      if (this.closed) return;
+      this.closed = true;
+      state.closedContextCount += 1;
+    }
   }
 
   class FixtureAudioWorkletNode {
     constructor() {
+      state.createdWorkletCount += 1;
+      state.activeWorkletCount += 1;
+      this.disconnected = false;
       this.port = { onmessage: null };
       setTimeout(() => {
-        this.port.onmessage?.({
+        if (!this.port.onmessage) return;
+        if (this.disconnected || state.activeWorkletCount === 0) {
+          state.postStopPcmCount += 1;
+        }
+        state.deliveredPcmCount += 1;
+        this.port.onmessage({
           data: Int16Array.from([500, -500, 750, -750]).buffer,
         });
       }, 20);
@@ -119,7 +180,13 @@ function audioFixtureScript({ microphoneMode }) {
 
     connect() {}
 
-    disconnect() {}
+    disconnect() {
+      state.workletDisconnectCallCount += 1;
+      if (this.disconnected) return;
+      this.disconnected = true;
+      state.disconnectedWorkletCount += 1;
+      state.activeWorkletCount -= 1;
+    }
   }
 
   const devices = [
@@ -128,6 +195,18 @@ function audioFixtureScript({ microphoneMode }) {
     { kind: 'audiooutput', deviceId: 'default', label: 'System default' },
     { kind: 'audiooutput', deviceId: 'sony', label: 'Sony Bluetooth (fixture)' },
   ];
+
+  function resolveMediaRequest(createStream) {
+    if (captureMode !== 'deferred') return Promise.resolve(createStream());
+    state.pendingMediaRequestCount += 1;
+    return new Promise((resolve) => {
+      pendingMediaResolvers.push(() => {
+        state.pendingMediaRequestCount -= 1;
+        resolve(createStream());
+      });
+    });
+  }
+
   const mediaDevices = {
     addEventListener() {},
     async enumerateDevices() {
@@ -136,13 +215,26 @@ function audioFixtureScript({ microphoneMode }) {
     async getUserMedia(constraints) {
       const requestedId = constraints.audio.deviceId?.exact || 'default';
       state.openedInputIds.push(requestedId);
+      state.microphoneOpenCount += 1;
       if (microphoneMode === 'permission-denied') {
         throw new DOMException('fixture permission denied', 'NotAllowedError');
       }
       const label =
         devices.find((device) => device.kind === 'audioinput' && device.deviceId === requestedId)
           ?.label || 'Unknown fixture input';
-      return new FixtureStream([new FixtureTrack(requestedId, label)]);
+      return resolveMediaRequest(
+        () => new FixtureStream([new FixtureTrack('audio', requestedId, label)]),
+      );
+    },
+    async getDisplayMedia() {
+      state.systemOpenCount += 1;
+      return resolveMediaRequest(
+        () =>
+          new FixtureStream([
+            new FixtureTrack('audio', 'system', 'System audio (fixture)'),
+            new FixtureTrack('video', 'display', 'Display video (fixture)'),
+          ]),
+      );
     },
   };
 
@@ -187,7 +279,7 @@ function audioFixtureScript({ microphoneMode }) {
   HTMLMediaElement.prototype.pause = function pause() {};
 }
 
-async function launchCue(microphoneMode) {
+async function launchCue(microphoneMode, fixtureOptions = {}) {
   const temporaryRoot = await mkdtemp(path.join(os.tmpdir(), 'cue-e2e-'));
   const userDataDir = path.join(temporaryRoot, 'user-data');
   await mkdir(userDataDir);
@@ -224,7 +316,11 @@ async function launchCue(microphoneMode) {
   page.on('request', (request) => {
     if (/^https?:/.test(request.url())) networkRequests.push(request.url());
   });
-  await page.addInitScript(audioFixtureScript, { microphoneMode });
+  await page.addInitScript(audioFixtureScript, {
+    captureMode: fixtureOptions.captureMode || 'immediate',
+    microphoneMode,
+    workletFailures: fixtureOptions.workletFailures || 0,
+  });
   await page.reload();
   await page.locator('#more-btn').click();
   await page.locator('#audio-input').waitFor();
@@ -302,3 +398,201 @@ test('E2E-AUDIO-DIAG-DENY-001 reports typed permission denial locally', async ()
     await fixture.close();
   }
 });
+
+test(
+  'E2E-CAPTURE-UI-001 coalesces renderer Start requests and releases both channels',
+  { timeout: 10_000 },
+  async () => {
+    const fixture = await launchCue('healthy');
+    try {
+      await fixture.page.locator('#s-close').click();
+      await fixture.page.locator('#stop-btn').click();
+      await fixture.page.waitForFunction(
+        () =>
+          window.__cueE2eAudio.microphoneOpenCount === 1 &&
+          window.__cueE2eAudio.systemOpenCount === 1 &&
+          window.__cueE2eAudio.createdContextCount === 2,
+      );
+
+      await fixture.page.locator('#stop-btn').click();
+      await fixture.page.waitForFunction(
+        () =>
+          window.__cueE2eAudio.closedContextCount === 2 &&
+          window.__cueE2eAudio.stoppedTrackCount === 3,
+      );
+
+      const state = await fixture.page.evaluate(() => window.__cueE2eAudio);
+      assert.equal(state.createdWorkletCount, 2);
+      assert.equal(state.disconnectedWorkletCount, 2);
+      assert.equal(state.workletDisconnectCallCount, 2);
+      assert.equal(state.contextCloseCallCount, 2);
+      assert.equal(state.trackStopCallCount, 3);
+      assert.equal(state.postStopPcmCount, 0);
+      assert.deepEqual(fixture.networkRequests, []);
+    } finally {
+      await fixture.close();
+    }
+  },
+);
+
+test(
+  'E2E-CAPTURE-STOP-RACE-001 disposes microphone and system streams resolved after Stop',
+  { timeout: 10_000 },
+  async () => {
+    const fixture = await launchCue('healthy', { captureMode: 'deferred' });
+    try {
+      await fixture.page.locator('#s-close').click();
+      await fixture.page.locator('#stop-btn').click();
+      await fixture.page.waitForFunction(
+        () =>
+          document.querySelector('#stop-btn')?.classList.contains('active') &&
+          window.__cueE2eAudio.pendingMediaRequestCount === 2,
+      );
+
+      await fixture.page.locator('#stop-btn').click();
+      await fixture.page.waitForFunction(
+        () => !document.querySelector('#stop-btn')?.classList.contains('active'),
+      );
+      await fixture.page.evaluate(() => window.__cueE2eAudio.resolvePendingMediaRequests());
+      await fixture.page.waitForFunction(
+        () =>
+          window.__cueE2eAudio.pendingMediaRequestCount === 0 &&
+          window.__cueE2eAudio.createdContextCount === 2 &&
+          window.__cueE2eAudio.closedContextCount === 2 &&
+          window.__cueE2eAudio.stoppedTrackCount === 3,
+      );
+      await fixture.page.waitForTimeout(50);
+
+      const state = await fixture.page.evaluate(() => window.__cueE2eAudio);
+      assert.equal(state.createdWorkletCount, 2);
+      assert.equal(state.disconnectedWorkletCount, 2);
+      assert.equal(state.workletDisconnectCallCount, 2);
+      assert.equal(state.contextCloseCallCount, 2);
+      assert.equal(state.trackStopCallCount, 3);
+      assert.equal(state.activeWorkletCount, 0);
+      assert.equal(state.deliveredPcmCount, 0);
+      assert.equal(state.postStopPcmCount, 0);
+      assert.deepEqual(fixture.networkRequests, []);
+    } finally {
+      await fixture.close();
+    }
+  },
+);
+
+test(
+  'E2E-CAPTURE-RECOVERY-001 retries cleanly after both worklet initializations fail',
+  { timeout: 10_000 },
+  async () => {
+    const fixture = await launchCue('healthy', {
+      captureMode: 'deferred',
+      workletFailures: 'until-released',
+    });
+    try {
+      await fixture.page.locator('#s-close').click();
+      await fixture.page.locator('#stop-btn').click();
+      await fixture.page.waitForFunction(() => window.__cueE2eAudio.pendingMediaRequestCount === 2);
+      await fixture.page.evaluate(() => window.__cueE2eAudio.resolvePendingMediaRequests());
+      await fixture.page.waitForFunction(
+        () =>
+          window.__cueE2eAudio.createdContextCount === 2 &&
+          window.__cueE2eAudio.closedContextCount === 2 &&
+          window.__cueE2eAudio.pendingMediaRequestCount === 0,
+      );
+      await fixture.page.locator('#stop-btn').click();
+      await fixture.page.waitForFunction(
+        () => !document.querySelector('#stop-btn')?.classList.contains('active'),
+      );
+      await fixture.page.evaluate(() => window.__cueE2eAudio.allowWorkletInitialization());
+
+      await fixture.page.locator('#stop-btn').click();
+      await fixture.page.waitForFunction(() => window.__cueE2eAudio.pendingMediaRequestCount === 2);
+      await fixture.page.evaluate(() => window.__cueE2eAudio.resolvePendingMediaRequests());
+      await fixture.page.waitForFunction(
+        () =>
+          window.__cueE2eAudio.createdContextCount === 4 &&
+          window.__cueE2eAudio.createdWorkletCount === 2 &&
+          window.__cueE2eAudio.activeWorkletCount === 2,
+      );
+      await fixture.page.locator('#stop-btn').click();
+      await fixture.page.waitForFunction(
+        () =>
+          window.__cueE2eAudio.closedContextCount === 4 &&
+          window.__cueE2eAudio.stoppedTrackCount === 6 &&
+          window.__cueE2eAudio.activeWorkletCount === 0,
+      );
+
+      const state = await fixture.page.evaluate(() => window.__cueE2eAudio);
+      assert.equal(state.microphoneOpenCount, 2);
+      assert.equal(state.systemOpenCount, 2);
+      assert.equal(state.disconnectedWorkletCount, 2);
+      assert.equal(state.workletDisconnectCallCount, 2);
+      assert.equal(state.contextCloseCallCount, 4);
+      assert.equal(state.trackStopCallCount, 6);
+      assert.equal(state.postStopPcmCount, 0);
+      assert.deepEqual(fixture.networkRequests, []);
+    } finally {
+      await fixture.close();
+    }
+  },
+);
+
+test(
+  'STRESS-CAPTURE-100-001 completes one hundred leak-free renderer Start and Stop cycles',
+  { timeout: 30_000 },
+  async () => {
+    const fixture = await launchCue('healthy');
+    try {
+      await fixture.page.locator('#s-close').click();
+      await fixture.page.evaluate(async (cycles) => {
+        const button = document.querySelector('#stop-btn');
+        const waitUntil = async (predicate) => {
+          const deadline = performance.now() + 2_000;
+          while (!predicate()) {
+            if (performance.now() >= deadline) throw new Error('fixture lifecycle timeout');
+            await new Promise((resolve) => setTimeout(resolve, 1));
+          }
+        };
+
+        for (let cycle = 1; cycle <= cycles; cycle += 1) {
+          button.click();
+          await waitUntil(
+            () =>
+              button.classList.contains('active') &&
+              window.__cueE2eAudio.createdContextCount === cycle * 2 &&
+              window.__cueE2eAudio.activeWorkletCount === 2,
+          );
+          button.click();
+          await waitUntil(
+            () =>
+              !button.classList.contains('active') &&
+              window.__cueE2eAudio.closedContextCount === cycle * 2 &&
+              window.__cueE2eAudio.stoppedTrackCount === cycle * 3 &&
+              window.__cueE2eAudio.activeWorkletCount === 0,
+          );
+        }
+      }, 100);
+      const deliveredAtStop = await fixture.page.evaluate(
+        () => window.__cueE2eAudio.deliveredPcmCount,
+      );
+      await fixture.page.waitForTimeout(50);
+
+      const state = await fixture.page.evaluate(() => window.__cueE2eAudio);
+      assert.equal(state.microphoneOpenCount, 100);
+      assert.equal(state.systemOpenCount, 100);
+      assert.equal(state.createdContextCount, 200);
+      assert.equal(state.closedContextCount, 200);
+      assert.equal(state.contextCloseCallCount, 200);
+      assert.equal(state.createdWorkletCount, 200);
+      assert.equal(state.disconnectedWorkletCount, 200);
+      assert.equal(state.workletDisconnectCallCount, 200);
+      assert.equal(state.activeWorkletCount, 0);
+      assert.equal(state.stoppedTrackCount, 300);
+      assert.equal(state.trackStopCallCount, 300);
+      assert.equal(state.deliveredPcmCount, deliveredAtStop);
+      assert.equal(state.postStopPcmCount, 0);
+      assert.deepEqual(fixture.networkRequests, []);
+    } finally {
+      await fixture.close();
+    }
+  },
+);

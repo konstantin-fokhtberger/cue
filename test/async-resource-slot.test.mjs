@@ -1,3 +1,4 @@
+import fc from 'fast-check';
 import { describe, expect, it, vi } from 'vitest';
 
 import { AsyncResourceSlot } from '../src/core/async-resource-slot.mjs';
@@ -102,5 +103,80 @@ describe('AsyncResourceSlot', () => {
     expect(slot.active).toBe(false);
     await expect(slot.start(create)).resolves.toBe(resource);
     expect(create).toHaveBeenCalledTimes(2);
+  });
+
+  it('PT-CAPTURE-SEQUENCE-001 preserves single ownership across generated lifecycle sequences', async () => {
+    await fc.assert(
+      fc.asyncProperty(
+        fc.array(
+          fc.constantFrom('start', 'double-start', 'failed-start', 'late-start-stop', 'stop'),
+          { maxLength: 100 },
+        ),
+        async (operations) => {
+          let nextResourceId = 0;
+          let expectedActive = null;
+          const createdResources = [];
+          const disposedResources = [];
+          const slot = new AsyncResourceSlot(async (resource) => {
+            disposedResources.push(resource);
+          });
+
+          const createResource = () => {
+            const resource = { id: nextResourceId };
+            nextResourceId += 1;
+            createdResources.push(resource);
+            return resource;
+          };
+
+          for (const operation of operations) {
+            if (operation === 'stop') {
+              await slot.stop();
+              expectedActive = null;
+            } else if (operation === 'start') {
+              const resource = await slot.start(createResource);
+              expectedActive ??= resource;
+              expect(resource).toBe(expectedActive);
+            } else if (operation === 'double-start') {
+              const first = slot.start(createResource);
+              const second = slot.start(createResource);
+              const [firstResource, secondResource] = await Promise.all([first, second]);
+              expectedActive ??= firstResource;
+              expect(firstResource).toBe(expectedActive);
+              expect(secondResource).toBe(expectedActive);
+            } else if (operation === 'failed-start') {
+              const failure = new Error('generated creation failure');
+              const result = await slot
+                .start(() => Promise.reject(failure))
+                .catch((error) => error);
+              if (expectedActive === null) {
+                expect(result).toBe(failure);
+              } else {
+                expect(result).toBe(expectedActive);
+              }
+            } else if (expectedActive !== null) {
+              const resource = await slot.start(createResource);
+              expect(resource).toBe(expectedActive);
+              await slot.stop();
+              expectedActive = null;
+            } else {
+              const creation = deferred();
+              const start = slot.start(() => creation.promise);
+              await slot.stop();
+              const resource = createResource();
+              creation.resolve(resource);
+              await expect(start).resolves.toBeNull();
+            }
+
+            expect(slot.active).toBe(expectedActive !== null);
+          }
+
+          await slot.stop();
+          expect(slot.active).toBe(false);
+          expect(disposedResources).toHaveLength(createdResources.length);
+          expect(new Set(disposedResources)).toEqual(new Set(createdResources));
+        },
+      ),
+      { numRuns: 500 },
+    );
   });
 });
