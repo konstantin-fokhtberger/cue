@@ -6,7 +6,7 @@
 | --------------- | ------------------------------------------------------ |
 | Backlog ID      | AUDIO-DIAG-001                                         |
 | Requirement IDs | FR-AUDIO-001, FR-AUDIO-004, FR-AUDIO-008, FR-AUDIO-009 |
-| Status          | implemented; CI and permission-denial E2E pending      |
+| Status          | implemented; permission-denial E2E pending             |
 | Owner           | project maintainer                                     |
 | Target revision | after BUG-PKG-001                                      |
 
@@ -97,6 +97,8 @@
 - `npm run quality`: 131 tests, 100% statements, branches, functions and lines.
 - `npm run test:mutation`: 775/775 mutants killed, mutation score 100%.
 - `npm run pack:local`: stable `com.cue.overlay` team-signed arm64 package produced.
+- GitHub Actions run `30254447031`: `quality` and `package-macos-arm64` passed for
+  implementation commit `8e43bb6`.
 - `UT-AUDIO-DIAG-STATE-001`: deterministic state, health, timeout and malformed-frame
   behavior.
 - `CT-AUDIO-DIAG-001`: local PCM graph isolation, late-start cancellation and complete
