@@ -78,21 +78,22 @@
 
 ## 3. Non-functional requirements
 
-| ID           | Priority | Status   | Requirement                                                     | Accepted measure                                                                       |
-| ------------ | -------: | -------- | --------------------------------------------------------------- | -------------------------------------------------------------------------------------- |
-| NFR-REL-001  |       P0 | accepted | Capture lifecycle must be deterministic                         | 100 consecutive automated Start/Stop cycles without leaked streams or duplicate events |
-| NFR-REL-002  |       P0 | accepted | Session isolation must hold under concurrency                   | Race, delayed callback, retry, and cancellation suites pass                            |
-| NFR-TEST-001 |       P0 | accepted | Project-owned production logic has complete structural coverage | 100% lines, statements, functions, and branches                                        |
-| NFR-TEST-002 |       P0 | accepted | Critical behavior resists weak assertions                       | 100% mutation score for lifecycle, routing, retention, and timeline modules            |
-| NFR-TEST-003 |       P0 | accepted | Every P0/P1 requirement is automated                            | Traceability contains no accepted P0/P1 requirement without a passing test reference   |
-| NFR-SEC-001  |       P0 | accepted | Renderer cannot exercise ambient privileged APIs                | Narrow IPC contracts, sender checks, schemas, bounds, and negative tests               |
-| NFR-SEC-002  |       P0 | accepted | Distributed build has stable identity                           | Signed and notarized package passes Gatekeeper verification                            |
-| NFR-PERF-001 |       P1 | accepted | Stop latency remains bounded                                    | p95 <= 500 ms on the target Mac                                                        |
-| NFR-PERF-002 |       P1 | accepted | Partial transcript is timely                                    | p95 <= 2 seconds after speech boundary                                                 |
-| NFR-PERF-003 |       P1 | accepted | Reply suggestion is timely                                      | First token p95 <= 3 seconds after explicit request, excluding provider outage         |
-| NFR-RES-001  |       P1 | accepted | Memory use is bounded for long meetings                         | Four-hour synthetic session remains under an accepted RSS growth limit                 |
-| NFR-OBS-001  |       P1 | accepted | Failures are diagnosable without exposing sensitive data        | Structured local events cover state transitions, provider timing, and sanitized errors |
-| NFR-COMP-001 |       P0 | accepted | First release supports only the specified personal Mac          | No broader compatibility claim without explicit test evidence                          |
+| ID           | Priority | Status   | Requirement                                                     | Accepted measure                                                                                                                    |
+| ------------ | -------: | -------- | --------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------- |
+| NFR-REL-001  |       P0 | accepted | Capture lifecycle must be deterministic                         | 100 consecutive automated Start/Stop cycles without leaked streams or duplicate events                                              |
+| NFR-REL-002  |       P0 | accepted | Session isolation must hold under concurrency                   | Race, delayed callback, retry, and cancellation suites pass                                                                         |
+| NFR-TEST-001 |       P0 | accepted | Project-owned production logic has complete structural coverage | 100% lines, statements, functions, and branches                                                                                     |
+| NFR-TEST-002 |       P0 | accepted | Critical behavior resists weak assertions                       | 100% mutation score for lifecycle, routing, retention, and timeline modules                                                         |
+| NFR-TEST-003 |       P0 | accepted | Every P0/P1 requirement is automated                            | Traceability contains no accepted P0/P1 requirement without a passing test reference                                                |
+| NFR-SEC-001  |       P0 | accepted | Renderer cannot exercise ambient privileged APIs                | Narrow IPC contracts, sender checks, schemas, bounds, and negative tests                                                            |
+| NFR-SEC-002  |       P0 | accepted | Distributed build has stable identity                           | Signed and notarized package passes Gatekeeper verification                                                                         |
+| NFR-SEC-003  |       P0 | accepted | Target-Mac test builds retain a stable TCC identity             | Consecutive local packages have `Identifier=com.cue.overlay`, the same non-empty TeamIdentifier and the same designated requirement |
+| NFR-PERF-001 |       P1 | accepted | Stop latency remains bounded                                    | p95 <= 500 ms on the target Mac                                                                                                     |
+| NFR-PERF-002 |       P1 | accepted | Partial transcript is timely                                    | p95 <= 2 seconds after speech boundary                                                                                              |
+| NFR-PERF-003 |       P1 | accepted | Reply suggestion is timely                                      | First token p95 <= 3 seconds after explicit request, excluding provider outage                                                      |
+| NFR-RES-001  |       P1 | accepted | Memory use is bounded for long meetings                         | Four-hour synthetic session remains under an accepted RSS growth limit                                                              |
+| NFR-OBS-001  |       P1 | accepted | Failures are diagnosable without exposing sensitive data        | Structured local events cover state transitions, provider timing, and sanitized errors                                              |
+| NFR-COMP-001 |       P0 | accepted | First release supports only the specified personal Mac          | No broader compatibility claim without explicit test evidence                                                                       |
 
 ## 4. Acceptance test matrix
 

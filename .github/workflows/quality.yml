@@ -85,5 +85,5 @@ jobs:
             sleep "$delay_seconds"
           done
 
-      - name: Package unsigned macOS application
-        run: npm run pack
+      - name: Package and verify ad-hoc macOS application
+        run: npm run pack:ci

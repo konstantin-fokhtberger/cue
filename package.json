@@ -23,6 +23,8 @@
     "quality": "npm run lint && npm run format:check && npm run typecheck && npm run validate:traceability && npm run test:coverage && npm run audit:production",
     "quality:full": "npm run quality && npm run test:mutation",
     "pack": "electron-builder --dir",
+    "pack:ci": "node tools/package-macos.mjs --adhoc",
+    "pack:local": "node tools/package-macos.mjs --local",
     "dist": "electron-builder --mac zip",
     "dist:win": "electron-builder --win"
   },
