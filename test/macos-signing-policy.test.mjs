@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import {
   MacSigningPolicyError,
+  buildAdhocBundleSigningArgs,
   buildElectronBuilderSigningArgs,
   parseCodeSigningIdentities,
   parseCodesignDetails,
@@ -354,6 +355,25 @@ TeamIdentifier=not set
       new MacSigningPolicyError(
         'packaging-identity-missing',
         'A code-signing identity is required for macOS packaging.',
+      ),
+    );
+  });
+
+  it('builds an explicit whole-bundle ad-hoc signing plan for CI', () => {
+    expect(buildAdhocBundleSigningArgs('/tmp/dist/cue.app')).toEqual([
+      '--force',
+      '--deep',
+      '--sign',
+      '-',
+      '/tmp/dist/cue.app',
+    ]);
+  });
+
+  it.each([undefined, null, '', 42])('rejects invalid application bundle path %j', (appBundle) => {
+    expect(() => buildAdhocBundleSigningArgs(appBundle)).toThrow(
+      new MacSigningPolicyError(
+        'app-bundle-missing',
+        'An application bundle path is required for ad-hoc signing.',
       ),
     );
   });

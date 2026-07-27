@@ -79,7 +79,7 @@ Teams и Google Meet. Пользователь должен явно видет�
 - Browser capture contract classifies `NotFoundError` and `OverconstrainedError` as
   `device-unavailable`; exact input selection therefore cannot silently degrade to default.
 - Full automated scope after signing-policy work: 100% statements/branches/functions/lines
-  and 636/636 mutants killed.
+  and 653/653 mutants killed.
 - Development Electron UI smoke test displayed independent Input and Output selectors,
   requested/effective status, and the explicit warning that meeting-app devices are separate.
 - Stable team-signed target package enumerated the real CoreAudio inventory. Explicit HyperX

@@ -131,3 +131,13 @@ export function buildElectronBuilderSigningArgs(identity, timestamp) {
   }
   return args;
 }
+
+export function buildAdhocBundleSigningArgs(appBundle) {
+  if (typeof appBundle !== 'string' || appBundle.length === 0) {
+    throw new MacSigningPolicyError(
+      'app-bundle-missing',
+      'An application bundle path is required for ad-hoc signing.',
+    );
+  }
+  return ['--force', '--deep', '--sign', '-', appBundle];
+}

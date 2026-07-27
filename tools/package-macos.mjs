@@ -5,6 +5,7 @@ import { fileURLToPath } from 'node:url';
 import { promisify } from 'node:util';
 
 import {
+  buildAdhocBundleSigningArgs,
   buildElectronBuilderSigningArgs,
   parseCodeSigningIdentities,
   parseCodesignDetails,
@@ -56,6 +57,10 @@ await execute(
     maxBuffer: 20 * 1024 * 1024,
   },
 );
+
+if (!requireTeam) {
+  await execute('/usr/bin/codesign', buildAdhocBundleSigningArgs(appBundle));
+}
 
 await execute('/usr/bin/codesign', ['--verify', '--deep', '--strict', appBundle]);
 

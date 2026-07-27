@@ -64,11 +64,14 @@ identifier на ad-hoc пакете без доступа к пользоват�
 
 ## Verification evidence
 
-- Unit/contract: 26 signing-policy tests pass.
+- Unit/contract: 31 signing-policy tests pass.
 - Coverage: full project scope remains at 100% statements, branches, functions, and lines.
-- Mutation: 636/636 mutants killed after the final signing-policy revision.
+- Mutation: 653/653 mutants killed after the final signing-policy revision.
 - CI package: ad-hoc bundle passed `codesign --verify --deep --strict`, retained
   `Identifier=com.cue.overlay`, and reported `tccStable=false`.
+- GitHub macOS 15 initially exposed an invalid resource envelope after electron-builder ad-hoc
+  signing. The CI-only path now performs an explicit final whole-bundle ad-hoc signing pass
+  before strict verification; the Apple Development path is unchanged.
 - Target Mac: two consecutive Apple Development packages passed strict/deep verification and
   produced identical `Identifier`, non-empty `TeamIdentifier`, signature size, and SHA-256
   fingerprint of the complete designated requirement.
