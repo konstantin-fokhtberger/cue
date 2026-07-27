@@ -85,7 +85,11 @@ Teams и Google Meet. Пользователь должен явно видет�
 - Stable team-signed target package enumerated the real CoreAudio inventory. Explicit HyperX
   input and built-in output selection passed, and both selections persisted across a full app
   restart.
+- With Sony reconnected, CoreAudio reported Sony Bluetooth as the macOS default input and
+  output while HyperX remained available as a separate USB input. cue retained explicit
+  HyperX input, accepted `.Sony (Bluetooth)` as its exact output sink, displayed it as
+  effective, and persisted both selections across a full Quit/launch cycle.
 - Live HyperX stream/restart evidence remains open because the current Listen flow rejects
   the request before capture when no transcription key is configured.
-- Sony was absent from both CoreAudio inventory and cue during this run. Exact Sony output
-  selection therefore remains open and must not be inferred from older evidence.
+- Audible cue-owned playback through Sony remains open because the current UI has no local
+  provider-free output test tone. The ended meeting cannot provide system-audio evidence.
