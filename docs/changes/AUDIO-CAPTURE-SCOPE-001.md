@@ -165,9 +165,9 @@ closed.
 
 ## Verification evidence
 
-- CI: [Pull request quality run 30368267606](https://github.com/konstantin-fokhtberger/cue/actions/runs/30368267606)
-  passed `quality` in 2m22s and `package-macos-arm64` in 8m46s, including Swift structural and
-  mutation gates, arm64 package verification, and packaged E2E.
+- CI: [Pull request quality run 30374267764](https://github.com/konstantin-fokhtberger/cue/actions/runs/30374267764)
+  passed `quality` in 3m08s and `package-macos-arm64` in 10m35s, including the expanded Swift
+  structural and mutation gates, arm64 package verification, and packaged E2E.
 - Coverage: `CaptureScopeResolver.swift` passed the Swift structural gate with 26/26 functions,
   27/27 instantiations, 187/187 lines, and 61/61 regions. The expanded
   `CoreAudioTapPlatform.swift` passed with 34/34 functions, 34/34 instantiations, 284/284 lines,
