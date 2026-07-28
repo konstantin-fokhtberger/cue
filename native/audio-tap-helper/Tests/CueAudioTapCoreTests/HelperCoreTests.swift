@@ -135,9 +135,8 @@ private final class FakeSession: AudioSession {
 }
 
 private final class FakeTermination: HelperControlling {
-  var configuration = HelperConfiguration(
+  var configuration = HelperConfiguration.capture(
     protocolVersion: 1,
-    command: .capture,
     scope: .diagnosticGlobal
   )
   var configurationError: Error?
@@ -591,6 +590,66 @@ final class HelperEventEncoderTests: XCTestCase {
       "{\"event\":\"error\",\"message\":\"bad \\\"value\\\"\"}\n"
     )
   }
+
+  func testInventoryEventEncodesAvailableAndUnresolvedSourcesExactly() throws {
+    let inventory = ApplicationCaptureInventory(
+      generation: 42,
+      sources: [
+        ApplicationCaptureSource(
+          identity: ResponsibleApplicationIdentity(
+            pid: 1_000,
+            bundleIdentifier: "com.google.Chrome",
+            displayName: "Google Chrome"
+          ),
+          status: .available,
+          audioProcessObjectIDs: [101, 102],
+          outputDeviceUIDs: ["sony"],
+          requiresBrowserWideAcknowledgement: true
+        ),
+        ApplicationCaptureSource(
+          identity: nil,
+          status: .unresolved(.missingProcessMetadata),
+          audioProcessObjectIDs: [201],
+          outputDeviceUIDs: [],
+          requiresBrowserWideAcknowledgement: false
+        ),
+      ]
+    )
+
+    XCTAssertEqual(
+      String(decoding: try encoder.encodeLine(.inventory(inventory)), as: UTF8.self),
+      "{\"event\":\"inventory\",\"generation\":42,\"sources\":[{\"audioProcessObjectIds\":[101,102],\"failure\":null,\"identity\":{\"bundleIdentifier\":\"com.google.Chrome\",\"displayName\":\"Google Chrome\",\"pid\":1000},\"outputDeviceUids\":[\"sony\"],\"requiresBrowserWideAcknowledgement\":true,\"status\":\"available\"},{\"audioProcessObjectIds\":[201],\"failure\":\"missing-process-metadata\",\"identity\":null,\"outputDeviceUids\":[],\"requiresBrowserWideAcknowledgement\":false,\"status\":\"unresolved\"}]}\n"
+    )
+  }
+
+  func testInventoryEventMapsEveryUnresolvedReason() throws {
+    let failures: [(ApplicationSourceFailure, String)] = [
+      (.cueOwnedAncestry, "cue-owned-ancestry"),
+      (.ancestryCycle, "ancestry-cycle"),
+      (.missingProcessMetadata, "missing-process-metadata"),
+      (.ancestryLimitExceeded, "ancestry-limit-exceeded"),
+      (.missingResponsibleIdentity, "missing-responsible-identity"),
+    ]
+
+    for (failure, expected) in failures {
+      let inventory = ApplicationCaptureInventory(
+        generation: 1,
+        sources: [
+          ApplicationCaptureSource(
+            identity: nil,
+            status: .unresolved(failure),
+            audioProcessObjectIDs: [1],
+            outputDeviceUIDs: [],
+            requiresBrowserWideAcknowledgement: false
+          )
+        ]
+      )
+      XCTAssertTrue(
+        String(decoding: try encoder.encodeLine(.inventory(inventory)), as: UTF8.self)
+          .contains("\"failure\":\"\(expected)\"")
+      )
+    }
+  }
 }
 
 final class HelperRunnerTests: XCTestCase {
@@ -634,6 +693,77 @@ final class HelperRunnerTests: XCTestCase {
         .started(sampleRate: 48_000, scope: .diagnosticGlobal),
         .stopped(metrics: session.snapshotValue),
       ])
+  }
+
+  func testInventoryCommandWritesOneSnapshotWithoutStartingOrWaiting() {
+    let session = FakeSession()
+    let termination = FakeTermination()
+    termination.configuration = .inventory(protocolVersion: 1, generation: 42)
+    let inventory = ApplicationCaptureInventory(generation: 42, sources: [])
+    var requestedGenerations = [UInt64]()
+    var events = [HelperEvent]()
+    let runner = HelperRunner(
+      session: session,
+      termination: termination,
+      inventory: {
+        requestedGenerations.append($0)
+        return inventory
+      },
+      encode: {
+        events.append($0)
+        return Data([1])
+      },
+      writeEvent: { _ in }
+    )
+
+    XCTAssertEqual(runner.run(), 0)
+    XCTAssertEqual(requestedGenerations, [42])
+    XCTAssertEqual(events, [.inventory(inventory)])
+    XCTAssertEqual(termination.readCount, 1)
+    XCTAssertEqual(termination.waitCount, 0)
+    XCTAssertEqual(session.operations, [])
+  }
+
+  func testInventoryFailureUsesTypedErrorWithoutStartingCapture() {
+    let session = FakeSession()
+    let termination = FakeTermination()
+    termination.configuration = .inventory(protocolVersion: 1, generation: 42)
+    var events = [HelperEvent]()
+    let runner = HelperRunner(
+      session: session,
+      termination: termination,
+      inventory: { _ in throw FixtureError.failed("inventory failed") },
+      encode: {
+        events.append($0)
+        return Data([1])
+      },
+      writeEvent: { _ in }
+    )
+
+    XCTAssertEqual(runner.run(), 1)
+    XCTAssertEqual(events, [.error(message: "inventory failed")])
+    XCTAssertEqual(termination.waitCount, 0)
+    XCTAssertEqual(session.operations, ["stop"])
+  }
+
+  func testInventoryCommandRequiresAnInjectedProvider() {
+    let session = FakeSession()
+    let termination = FakeTermination()
+    termination.configuration = .inventory(protocolVersion: 1, generation: 42)
+    var events = [HelperEvent]()
+    let runner = HelperRunner(
+      session: session,
+      termination: termination,
+      encode: {
+        events.append($0)
+        return Data([1])
+      },
+      writeEvent: { _ in }
+    )
+
+    XCTAssertEqual(runner.run(), 1)
+    XCTAssertEqual(events, [.error(message: HelperError.invalidState.description)])
+    XCTAssertEqual(session.operations, ["stop"])
   }
 
   func testConfigurationFailurePreventsCaptureAndWritesTypedError() {

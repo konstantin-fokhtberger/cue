@@ -147,8 +147,21 @@ closed.
   responsible identity, or cue-owned ancestry remains explicitly non-selectable.
 - Direct CoreAudio, AppKit, and libproc calls are isolated behind injected ports; cue-owned and
   application classification remains in the structurally covered platform policy.
-- Renderer selection UI, application-scope control protocol, and inclusion-tap wiring remain
-  outside this slice.
+- The version-one helper control protocol supports a one-shot `inventory` command with a bounded
+  positive generation and emits exactly one newline-delimited inventory event without starting
+  the capture lifecycle.
+- The Electron inventory client bounds stdout, stderr, time, event count, and concurrency; it
+  rejects stale generations, helper errors, unexpected PCM, malformed framing, and nonzero exit.
+- Trusted-renderer IPC exposes only refresh and select operations. Refresh invalidates the
+  previous ephemeral selection, and both operations are rejected while capture is active.
+- A covered coordinator owns refresh generations and fail-closed selection state; concurrent
+  refresh, capture activation during refresh, helper failure, and retry cannot retain stale
+  inventory.
+- The settings UI keeps same-bundle instances separate, discloses the exact Chrome browser-wide
+  boundary, and requires acknowledgement before accepting that selection.
+- Requested application scope remains explicitly `verified: false`. Inclusion-tap wiring,
+  effective-scope lifecycle, provider dispatch, and target-Mac isolation remain outside this
+  slice and continue to fail closed.
 
 ## Verification evidence
 
@@ -158,16 +171,25 @@ closed.
 - Coverage: `CaptureScopeResolver.swift` passed the Swift structural gate with 26/26 functions,
   27/27 instantiations, 187/187 lines, and 61/61 regions. The expanded
   `CoreAudioTapPlatform.swift` passed with 34/34 functions, 34/34 instantiations, 284/284 lines,
-  and 102/102 regions.
-- Mutation: all 16 resolver-specific and all 12 live-inventory-specific mutants were killed; the
-  complete local Swift gate killed 102/102 viable mutants with 0 survived and 0 unviable.
+  and 102/102 regions. The final local JS gate passed 740/740 statements, 407/407 branches,
+  142/142 functions, and 720/720 lines across 261 tests.
+- Mutation: all 16 resolver-specific and all 12 live-inventory-specific mutants were killed. The
+  helper inventory protocol, event mapping, generation forwarding, and no-capture-lifecycle
+  assertions passed the expanded local Swift mutation gate at 114/114 killed, 0 survived, and 0
+  unviable. The final local JS gate scored 100% with 1,503 killed, 4 timed out, 0 survived, and 0
+  without coverage across 1,507 tested mutants.
 - Performance: pending.
 - Real device: pending.
-- Package: the changed live-inventory slice passed local and CI arm64 ad-hoc packaging, strict
-  signing inspection, and packaged E2E 9/9.
+- Package: the selector/IPC slice passed local arm64 ad-hoc packaging, strict signing-policy
+  inspection, source E2E 10/10, and packaged E2E 10/10. The ad-hoc CI-style package correctly
+  reports `tccStable: false`; stable local TCC identity is not claimed by this evidence.
+- Live helper protocol: the production helper accepted generation 1, emitted exactly one
+  `inventory` event with an empty source list, wrote zero stdout bytes, and exited zero. No active
+  audio source was present, so live source metadata acceptance is not inferred from this check.
 - Provider boundary: `CT-NO-GLOBAL-STT-001` policy rejects absent, inherited, diagnostic-global,
-  and unverified scopes. The pure resolver and injected live inventory composition are verified;
-  live CoreAudio metadata acceptance and application-scope IPC integration remain pending.
+  and unverified scopes. The pure resolver, injected live inventory composition, helper inventory
+  protocol, bounded Electron client, and application-scope IPC/UI are implemented; live CoreAudio
+  metadata acceptance, inclusion tap, and provider integration remain pending.
 
 ## Residual risks and follow-up
 

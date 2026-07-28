@@ -182,6 +182,31 @@ const coreMutations = [
     to: '"event": "idle",',
   },
   {
+    id: 'protocol-inventory-name',
+    from: '"event": "inventory",',
+    to: '"event": "applications",',
+  },
+  {
+    id: 'protocol-inventory-generation',
+    from: '"generation": inventory.generation,',
+    to: '"generation": inventory.generation + 1,',
+  },
+  {
+    id: 'protocol-inventory-sources',
+    from: '"sources": inventory.sources.map(encodeInventorySource),',
+    to: '"sources": [],',
+  },
+  {
+    id: 'protocol-inventory-available-status',
+    from: 'status = "available"',
+    to: 'status = "unresolved"',
+  },
+  {
+    id: 'protocol-inventory-available-failure',
+    from: 'failure = NSNull()',
+    to: 'failure = "missing-process-metadata"',
+  },
+  {
     id: 'protocol-error-name',
     from: 'object = ["event": "error", "message": message]',
     to: 'object = ["event": "failure", "message": message]',
@@ -197,14 +222,29 @@ const coreMutations = [
     to: '_ = termination',
   },
   {
+    id: 'runner-inventory-generation-forwarding',
+    from: 'try writeEvent(encode(.inventory(try inventory(generation))))',
+    to: 'try writeEvent(encode(.inventory(try inventory(generation + 1))))',
+  },
+  {
+    id: 'runner-inventory-starts-capture',
+    from: 'case .inventory(_, let generation):\n        try writeEvent',
+    to: 'case .inventory(_, let generation):\n        _ = try session.start()\n        try writeEvent',
+  },
+  {
     id: 'runner-drains-before-stop-event',
     from: 'session.drain()',
     to: '_ = session',
   },
   {
-    id: 'runner-success-code',
-    from: 'return 0',
-    to: 'return 2',
+    id: 'runner-capture-success-code',
+    from: 'try writeEvent(encode(.stopped(metrics: session.snapshot())))\n        return 0',
+    to: 'try writeEvent(encode(.stopped(metrics: session.snapshot())))\n        return 2',
+  },
+  {
+    id: 'runner-inventory-success-code',
+    from: 'try writeEvent(encode(.inventory(try inventory(generation))))\n        return 0',
+    to: 'try writeEvent(encode(.inventory(try inventory(generation))))\n        return 2',
   },
   {
     id: 'runner-error-code',
@@ -220,13 +260,33 @@ const controlMutations = [
   },
   {
     id: 'control-command-required',
-    from: 'let command = HelperCommand(rawValue: commandValue),',
-    to: 'let command = HelperCommand(rawValue: "capture"),',
+    from: 'let command = HelperCommand(rawValue: commandValue)',
+    to: 'let command = HelperCommand(rawValue: "capture")',
   },
   {
     id: 'control-scope-required',
     from: 'scopeKind == "diagnostic-global"',
     to: 'scopeKind != "diagnostic-global"',
+  },
+  {
+    id: 'control-inventory-envelope-required',
+    from: 'Set(object.keys) == ["command", "generation", "protocolVersion"],',
+    to: 'true,',
+  },
+  {
+    id: 'control-inventory-positive-generation',
+    from: 'generation > 0,',
+    to: 'generation >= 0,',
+  },
+  {
+    id: 'control-inventory-safe-generation',
+    from: 'generation <= 9_007_199_254_740_991',
+    to: 'generation < 9_007_199_254_740_991',
+  },
+  {
+    id: 'control-inventory-generation-forwarding',
+    from: 'return .inventory(protocolVersion: version, generation: UInt64(generation))',
+    to: 'return .inventory(protocolVersion: version, generation: UInt64(generation + 1))',
   },
   {
     id: 'control-message-bound-inclusive',
@@ -596,6 +656,9 @@ const sourceByRelativePath = new Map(
     ),
   ),
 );
+for (const mutation of mutations) {
+  replaceExactlyOnce(sourceByRelativePath.get(mutation.relativePath), mutation);
+}
 const rootTemporaryDirectory = await mkdtemp(path.join(os.tmpdir(), 'cue-swift-mutation-'));
 const results = [];
 try {

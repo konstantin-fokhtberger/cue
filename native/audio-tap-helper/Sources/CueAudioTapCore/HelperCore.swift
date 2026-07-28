@@ -289,6 +289,7 @@ public final class AudioTapSession: AudioSession {
 public enum HelperEvent: Equatable {
   case started(sampleRate: Double, scope: CaptureScope)
   case stopped(metrics: SignalSnapshot)
+  case inventory(ApplicationCaptureInventory)
   case error(message: String)
 }
 
@@ -319,6 +320,12 @@ public struct HelperEventEncoder {
           "peak": metrics.peak,
         ],
       ]
+    case .inventory(let inventory):
+      object = [
+        "event": "inventory",
+        "generation": inventory.generation,
+        "sources": inventory.sources.map(encodeInventorySource),
+      ]
     case .error(let message):
       object = ["event": "error", "message": message]
     }
@@ -326,22 +333,73 @@ public struct HelperEventEncoder {
     data.append(0x0A)
     return data
   }
+
+  private func encodeInventorySource(_ source: ApplicationCaptureSource) -> [String: Any] {
+    let identity: Any
+    if let value = source.identity {
+      identity = [
+        "bundleIdentifier": value.bundleIdentifier,
+        "displayName": value.displayName,
+        "pid": value.pid,
+      ]
+    } else {
+      identity = NSNull()
+    }
+    let status: String
+    let failure: Any
+    switch source.status {
+    case .available:
+      status = "available"
+      failure = NSNull()
+    case .unresolved(let value):
+      status = "unresolved"
+      failure = encodeFailure(value)
+    }
+    return [
+      "audioProcessObjectIds": source.audioProcessObjectIDs,
+      "failure": failure,
+      "identity": identity,
+      "outputDeviceUids": source.outputDeviceUIDs,
+      "requiresBrowserWideAcknowledgement": source.requiresBrowserWideAcknowledgement,
+      "status": status,
+    ]
+  }
+
+  private func encodeFailure(_ failure: ApplicationSourceFailure) -> String {
+    switch failure {
+    case .cueOwnedAncestry:
+      "cue-owned-ancestry"
+    case .ancestryCycle:
+      "ancestry-cycle"
+    case .missingProcessMetadata:
+      "missing-process-metadata"
+    case .ancestryLimitExceeded:
+      "ancestry-limit-exceeded"
+    case .missingResponsibleIdentity:
+      "missing-responsible-identity"
+    }
+  }
 }
 
 public final class HelperRunner {
   private let session: AudioSession
   private let termination: HelperControlling
+  private let inventory: (UInt64) throws -> ApplicationCaptureInventory
   private let encode: (HelperEvent) throws -> Data
   private let writeEvent: (Data) throws -> Void
 
   public init(
     session: AudioSession,
     termination: HelperControlling,
+    inventory: @escaping (UInt64) throws -> ApplicationCaptureInventory = {
+      _ in throw HelperError.invalidState
+    },
     encode: @escaping (HelperEvent) throws -> Data = HelperEventEncoder().encodeLine,
     writeEvent: @escaping (Data) throws -> Void
   ) {
     self.session = session
     self.termination = termination
+    self.inventory = inventory
     self.encode = encode
     self.writeEvent = writeEvent
   }
@@ -349,13 +407,19 @@ public final class HelperRunner {
   public func run() -> Int32 {
     do {
       let configuration = try termination.readConfiguration()
-      let sampleRate = try session.start()
-      try writeEvent(encode(.started(sampleRate: sampleRate, scope: configuration.scope)))
-      try termination.wait()
-      session.stop()
-      session.drain()
-      try writeEvent(encode(.stopped(metrics: session.snapshot())))
-      return 0
+      switch configuration {
+      case .capture(_, let scope):
+        let sampleRate = try session.start()
+        try writeEvent(encode(.started(sampleRate: sampleRate, scope: scope)))
+        try termination.wait()
+        session.stop()
+        session.drain()
+        try writeEvent(encode(.stopped(metrics: session.snapshot())))
+        return 0
+      case .inventory(_, let generation):
+        try writeEvent(encode(.inventory(try inventory(generation))))
+        return 0
+      }
     } catch {
       session.stop()
       if let payload = try? encode(.error(message: String(describing: error))) {

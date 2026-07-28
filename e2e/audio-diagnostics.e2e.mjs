@@ -297,8 +297,57 @@ process.stdin.on('data', (chunk) => {
   const newline = control.indexOf('\\n');
   if (newline === -1) return;
   if (newline !== control.length - 1) process.exit(2);
-  const expected = '{"command":"capture","protocolVersion":1,"scope":{"kind":"diagnostic-global"}}';
-  if (control.slice(0, newline) !== expected) process.exit(2);
+  let message;
+  try {
+    message = JSON.parse(control.slice(0, newline));
+  } catch {
+    process.exit(2);
+  }
+  if (
+    message.command === 'inventory' &&
+    message.protocolVersion === 1 &&
+    Number.isSafeInteger(message.generation) &&
+    message.generation > 0 &&
+    Object.keys(message).sort().join(',') === 'command,generation,protocolVersion'
+  ) {
+    process.stderr.write(JSON.stringify({
+      event: 'inventory',
+      generation: message.generation,
+      sources: [
+        {
+          identity: {
+            pid: 1000,
+            bundleIdentifier: 'com.google.Chrome',
+            displayName: 'Google Chrome',
+          },
+          status: 'available',
+          failure: null,
+          audioProcessObjectIds: [101, 102],
+          outputDeviceUids: ['sony'],
+          requiresBrowserWideAcknowledgement: true,
+        },
+        {
+          identity: {
+            pid: 2000,
+            bundleIdentifier: 'us.zoom.xos',
+            displayName: 'zoom.us',
+          },
+          status: 'available',
+          failure: null,
+          audioProcessObjectIds: [201],
+          outputDeviceUids: ['sony'],
+          requiresBrowserWideAcknowledgement: false,
+        },
+      ],
+    }) + '\\n');
+    process.exit(0);
+  }
+  const expected = {
+    command: 'capture',
+    protocolVersion: 1,
+    scope: { kind: 'diagnostic-global' },
+  };
+  if (JSON.stringify(message) !== JSON.stringify(expected)) process.exit(2);
   started = true;
   appendFileSync(logPath, \`start:\${process.ppid}:\${process.pid}\\n\`);
   if (mode === 'initialization-failed') {
@@ -490,6 +539,39 @@ test('E2E-AUDIO-DIAG-DENY-001 reports typed permission denial locally', async ()
     const state = await fixture.page.evaluate(() => window.__cueE2eAudio);
     assert.deepEqual(state.openedInputIds, ['hyperx']);
     assert.equal(state.outputPlayCount, 0);
+    assert.deepEqual(fixture.networkRequests, []);
+  } finally {
+    await fixture.close();
+  }
+});
+
+test('E2E-CAPTURE-SCOPE-001 / E2E-BROWSER-SCOPE-DISCLOSURE-001 requires explicit browser-wide acknowledgement', async () => {
+  const fixture = await launchCue('healthy');
+  try {
+    const application = fixture.page.locator('#capture-application');
+    await application
+      .locator('option', {
+        hasText: 'Google Chrome - all audible tabs in this browser instance',
+      })
+      .waitFor({ state: 'attached' });
+    await application.selectOption({
+      label: 'Google Chrome - all audible tabs in this browser instance',
+    });
+    await fixture.page
+      .locator('#capture-application-status')
+      .filter({ hasText: 'Confirm browser-wide capture' })
+      .waitFor();
+    await assert.doesNotReject(() =>
+      fixture.page.locator('#capture-browser-ack-wrap:not(.hidden)').waitFor(),
+    );
+
+    await fixture.page.locator('#capture-browser-ack').check();
+    await fixture.page
+      .locator('#capture-application-status')
+      .filter({
+        hasText: 'Requested: Google Chrome. Effective: not verified until native capture starts.',
+      })
+      .waitFor();
     assert.deepEqual(fixture.networkRequests, []);
   } finally {
     await fixture.close();

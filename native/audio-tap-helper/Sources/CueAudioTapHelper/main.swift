@@ -40,6 +40,7 @@ private let session = AudioTapSession(
 private let runner = HelperRunner(
   session: session,
   termination: control,
+  inventory: { try platform.applicationCaptureInventory(generation: $0) },
   writeEvent: { FileHandle.standardError.write($0) }
 )
 

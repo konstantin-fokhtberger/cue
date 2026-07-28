@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import {
   DIAGNOSTIC_GLOBAL_CAPTURE,
   encodeHelperCaptureConfiguration,
+  encodeHelperInventoryRequest,
 } from '../src/core/helper-control-protocol.mjs';
 
 describe('helper control protocol v1', () => {
@@ -40,4 +41,19 @@ describe('helper control protocol v1', () => {
       new TypeError('Unsupported native helper capture configuration.'),
     );
   });
+
+  it('encodes an exact versioned application inventory request', () => {
+    expect(encodeHelperInventoryRequest(42)).toEqual(
+      Buffer.from('{"command":"inventory","generation":42,"protocolVersion":1}\n'),
+    );
+  });
+
+  it.each([undefined, null, 0, -1, 1.5, Number.NaN, Number.MAX_SAFE_INTEGER + 1])(
+    'rejects invalid inventory generation %j',
+    (generation) => {
+      expect(() => encodeHelperInventoryRequest(generation)).toThrow(
+        new TypeError('Invalid native helper inventory generation.'),
+      );
+    },
+  );
 });

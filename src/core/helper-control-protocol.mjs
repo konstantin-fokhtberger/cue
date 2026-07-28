@@ -27,3 +27,16 @@ export function encodeHelperCaptureConfiguration(configuration) {
     })}\n`,
   );
 }
+
+export function encodeHelperInventoryRequest(generation) {
+  if (!Number.isSafeInteger(generation) || generation <= 0) {
+    throw new TypeError('Invalid native helper inventory generation.');
+  }
+  return Buffer.from(
+    `${JSON.stringify({
+      command: 'inventory',
+      generation,
+      protocolVersion: 1,
+    })}\n`,
+  );
+}

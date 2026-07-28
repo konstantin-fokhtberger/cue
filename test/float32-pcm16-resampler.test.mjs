@@ -48,6 +48,17 @@ describe('Float32Pcm16Resampler', () => {
     ]);
   });
 
+  it('clamps negative samples below minus one before PCM conversion', () => {
+    const resampler = new Float32Pcm16Resampler({
+      inputSampleRate: 16_000,
+      outputSampleRate: 16_000,
+    });
+
+    const output = resampler.push(floatBuffer([-2]));
+
+    expect(output.readInt16LE(0)).toBe(-32_768);
+  });
+
   it('preserves partial Float32 bytes and phase across arbitrary pipe chunks', () => {
     const samples = [0.1, 0.2, 0.3, -0.4, -0.5, -0.6, 0.7, 0.8, 0.9];
     const input = floatBuffer(samples);

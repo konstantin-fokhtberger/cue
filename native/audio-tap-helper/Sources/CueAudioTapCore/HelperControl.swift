@@ -2,6 +2,7 @@ import Foundation
 
 public enum HelperCommand: String, Equatable {
   case capture
+  case inventory
 }
 
 public enum CaptureScope: Equatable {
@@ -15,20 +16,9 @@ public enum CaptureScope: Equatable {
   }
 }
 
-public struct HelperConfiguration: Equatable {
-  public let protocolVersion: Int
-  public let command: HelperCommand
-  public let scope: CaptureScope
-
-  public init(
-    protocolVersion: Int,
-    command: HelperCommand,
-    scope: CaptureScope
-  ) {
-    self.protocolVersion = protocolVersion
-    self.command = command
-    self.scope = scope
-  }
+public enum HelperConfiguration: Equatable {
+  case capture(protocolVersion: Int, scope: CaptureScope)
+  case inventory(protocolVersion: Int, generation: UInt64)
 }
 
 public struct HelperControlDecoder {
@@ -37,24 +27,37 @@ public struct HelperControlDecoder {
   public func decode(_ data: Data) throws -> HelperConfiguration {
     guard
       let object = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
-      Set(object.keys) == ["command", "protocolVersion", "scope"],
       let version = object["protocolVersion"] as? Int,
       version == 1,
       let commandValue = object["command"] as? String,
-      let command = HelperCommand(rawValue: commandValue),
-      let scope = object["scope"] as? [String: Any],
-      Set(scope.keys) == ["kind"],
-      let scopeKind = scope["kind"] as? String,
-      scopeKind == "diagnostic-global"
+      let command = HelperCommand(rawValue: commandValue)
     else {
       throw HelperError.invalidControlMessage
     }
 
-    return HelperConfiguration(
-      protocolVersion: version,
-      command: command,
-      scope: .diagnosticGlobal
-    )
+    switch command {
+    case .capture:
+      guard
+        Set(object.keys) == ["command", "protocolVersion", "scope"],
+        let scope = object["scope"] as? [String: Any],
+        Set(scope.keys) == ["kind"],
+        let scopeKind = scope["kind"] as? String,
+        scopeKind == "diagnostic-global"
+      else {
+        throw HelperError.invalidControlMessage
+      }
+      return .capture(protocolVersion: version, scope: .diagnosticGlobal)
+    case .inventory:
+      guard
+        Set(object.keys) == ["command", "generation", "protocolVersion"],
+        let generation = object["generation"] as? Int,
+        generation > 0,
+        generation <= 9_007_199_254_740_991
+      else {
+        throw HelperError.invalidControlMessage
+      }
+      return .inventory(protocolVersion: version, generation: UInt64(generation))
+    }
   }
 }
 

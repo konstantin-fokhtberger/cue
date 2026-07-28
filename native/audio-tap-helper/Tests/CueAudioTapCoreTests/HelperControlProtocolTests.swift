@@ -10,11 +10,21 @@ final class HelperControlProtocolTests: XCTestCase {
   func testDecoderAcceptsOnlyTheVersionOneDiagnosticGlobalEnvelope() throws {
     XCTAssertEqual(
       try HelperControlDecoder().decode(validLine),
-      HelperConfiguration(
-        protocolVersion: 1,
-        command: .capture,
-        scope: .diagnosticGlobal
-      )
+      .capture(protocolVersion: 1, scope: .diagnosticGlobal)
+    )
+    XCTAssertEqual(
+      try HelperControlDecoder().decode(
+        Data(#"{"command":"inventory","generation":42,"protocolVersion":1}"#.utf8)
+      ),
+      .inventory(protocolVersion: 1, generation: 42)
+    )
+    XCTAssertEqual(
+      try HelperControlDecoder().decode(
+        Data(
+          #"{"command":"inventory","generation":9007199254740991,"protocolVersion":1}"#.utf8
+        )
+      ),
+      .inventory(protocolVersion: 1, generation: 9_007_199_254_740_991)
     )
   }
 
@@ -23,8 +33,17 @@ final class HelperControlProtocolTests: XCTestCase {
       Data(),
       Data("not-json".utf8),
       Data(#"{"command":"capture","protocolVersion":2,"scope":{"kind":"diagnostic-global"}}"#.utf8),
+      Data(#"{"command":"inventory","protocolVersion":1}"#.utf8),
+      Data(#"{"command":"inventory","generation":0,"protocolVersion":1}"#.utf8),
+      Data(#"{"command":"inventory","generation":-1,"protocolVersion":1}"#.utf8),
+      Data(#"{"command":"inventory","generation":1.5,"protocolVersion":1}"#.utf8),
       Data(
-        #"{"command":"inventory","protocolVersion":1,"scope":{"kind":"diagnostic-global"}}"#.utf8),
+        #"{"command":"inventory","generation":9007199254740992,"protocolVersion":1}"#.utf8
+      ),
+      Data(#"{"command":"inventory","extra":true,"generation":1,"protocolVersion":1}"#.utf8),
+      Data(
+        #"{"command":"inventory","generation":1,"protocolVersion":1,"scope":{"kind":"diagnostic-global"}}"#
+          .utf8),
       Data(#"{"command":"capture","protocolVersion":1,"scope":{"kind":"application"}}"#.utf8),
       Data(
         #"{"command":"capture","extra":true,"protocolVersion":1,"scope":{"kind":"diagnostic-global"}}"#
@@ -101,11 +120,7 @@ final class HelperControlProtocolTests: XCTestCase {
 
     XCTAssertEqual(
       try control.readConfiguration(),
-      HelperConfiguration(
-        protocolVersion: 1,
-        command: .capture,
-        scope: .diagnosticGlobal
-      )
+      .capture(protocolVersion: 1, scope: .diagnosticGlobal)
     )
     XCTAssertNoThrow(try control.wait())
     XCTAssertTrue(chunks.isEmpty)
