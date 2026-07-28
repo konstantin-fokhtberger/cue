@@ -68,8 +68,12 @@ Before `ADR-006` can be treated as release-ready, `TEST-NATIVE-AUDIO-001` must:
 5. Keep real CoreAudio/TCC and process-lifecycle acceptance on the target Mac because structural
    coverage cannot prove platform behavior.
 
-The current JavaScript 100% report must never be described as whole-product coverage while the
-Swift helper remains outside this gate.
+The JavaScript 100% report and the `CueAudioTapCore` 100% line/function/instantiation/region report
+must never be combined or described as whole-product coverage. Swift/LLVM currently emits no
+native branch records for this package, so branch-equivalent evidence requires the accepted
+condition mutation gate. The executable CoreAudio binding and signal bootstrap remain outside the
+structural test binary; accepting that exact boundary as platform glue requires explicit owner
+approval and does not replace live target-Mac evidence.
 
 ## 4. Mutation policy
 

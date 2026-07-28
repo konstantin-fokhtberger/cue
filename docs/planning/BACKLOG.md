@@ -43,7 +43,7 @@
 | TEST-AUDIO-001          | EPIC-002 |       P0 | done     | Capture adapter contract suite and deterministic audio fixtures                    | TOOL-001                                     |
 | TEST-AUDIO-002          | EPIC-002 |       P0 | proposed | Zoom/Teams/Meet x accepted audio-route automation matrix                           | SPIKE-AUDIO-001, AUDIO-DEVICE-001, CI-002    |
 | ADR-AUDIO-001           | EPIC-002 |       P0 | done     | Accept native CoreAudio Tap helper based on spike evidence                         | SPIKE-AUDIO-001                              |
-| TEST-NATIVE-AUDIO-001   | EPIC-002 |       P0 | ready    | Add 100% structural and mutation coverage plus failure-path tests for Swift helper | ADR-AUDIO-001                                |
+| TEST-NATIVE-AUDIO-001   | EPIC-002 |       P0 | blocked  | Complete Swift structural/mutation gates and resolve platform-glue coverage scope  | ADR-AUDIO-001, owner coverage-scope decision |
 | BUG-AUDIO-004           | EPIC-002 |       P0 | ready    | Terminate native helper and release CoreAudio resources on parent death            | ADR-AUDIO-001, TEST-NATIVE-AUDIO-001         |
 | ADR-CAPTURE-SCOPE-001   | EPIC-006 |       P0 | done     | Accept explicit application scope and disclosed browser-wide Chrome capture        | ADR-AUDIO-001                                |
 | AUDIO-CAPTURE-SCOPE-001 | EPIC-002 |       P0 | blocked  | Implement verified application scope, cue exclusion, and no-global-fallback policy | ADR-CAPTURE-SCOPE-001, TEST-NATIVE-AUDIO-001 |
@@ -70,8 +70,8 @@
 
 The next implementation package should contain:
 
-1. `TEST-NATIVE-AUDIO-001` - make project-owned Swift logic meet the accepted 100% structural
-   coverage policy.
+1. `TEST-NATIVE-AUDIO-001` - review the proven 100% Swift core structural/mutation gates and
+   explicitly accept or reject the remaining CoreAudio binding/bootstrap coverage boundary.
 2. `BUG-AUDIO-004` and `AUDIO-CAPTURE-SCOPE-001` - introduce one versioned stdin configuration
    and parent-liveness protocol, then implement verified application scope without a global
    fallback.

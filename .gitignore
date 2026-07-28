@@ -8,3 +8,4 @@ cue-data.json
 coverage/
 reports/
 .stryker-tmp/
+native/audio-tap-helper/.build/

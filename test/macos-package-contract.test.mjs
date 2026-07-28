@@ -7,6 +7,14 @@ const helperBuildSource = await readFile(
   new URL('../tools/build-audio-helper.mjs', import.meta.url),
   'utf8',
 );
+const swiftPackageSource = await readFile(
+  new URL('../native/audio-tap-helper/Package.swift', import.meta.url),
+  'utf8',
+);
+const qualityWorkflowSource = await readFile(
+  new URL('../.github/workflows/quality.yml', import.meta.url),
+  'utf8',
+);
 
 describe('IT-PACKAGE-AUDIO-USAGE-001 macOS CoreAudio Tap package contract', () => {
   it('uses a stable bundle identity and declares system-audio capture purpose', () => {
@@ -29,7 +37,14 @@ describe('IT-PACKAGE-AUDIO-USAGE-001 macOS CoreAudio Tap package contract', () =
       from: 'build/native/cue-audio-tap-helper',
       to: 'native/cue-audio-tap-helper',
     });
-    expect(helperBuildSource).toContain("native', 'audio-tap-helper', 'main.swift");
-    expect(helperBuildSource).toContain("native', 'audio-tap-helper', 'Info.plist");
+    expect(helperBuildSource).toContain("native', 'audio-tap-helper");
+    expect(helperBuildSource).toContain("'swift', 'build'");
+    expect(helperBuildSource).toContain("'cue-audio-tap-helper'");
+    expect(swiftPackageSource).toContain('.library(name: "CueAudioTapCore"');
+    expect(swiftPackageSource).toContain('.executable(name: "cue-audio-tap-helper"');
+    expect(swiftPackageSource).toContain('"__info_plist"');
+    expect(packageJson.scripts['test:swift']).toBe('node tools/test-swift-helper.mjs');
+    expect(packageJson.scripts['test:swift:mutation']).toBe('node tools/mutate-swift-helper.mjs');
+    expect(qualityWorkflowSource).toContain('npm run test:swift && npm run test:swift:mutation');
   });
 });

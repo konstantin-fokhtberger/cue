@@ -85,6 +85,9 @@ jobs:
             sleep "$delay_seconds"
           done
 
+      - name: Run native Swift structural and mutation gates
+        run: npm run test:swift && npm run test:swift:mutation
+
       - name: Package and verify ad-hoc macOS application
         run: npm run pack:ci
 

@@ -18,6 +18,8 @@
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
     "test:mutation": "stryker run",
+    "test:swift": "node tools/test-swift-helper.mjs",
+    "test:swift:mutation": "node tools/mutate-swift-helper.mjs",
     "lint": "eslint . --max-warnings 0",
     "format:check": "prettier --check \"AGENTS.md\" \".github/**/*.yml\" \"docs/**/*.md\" \"e2e/**/*.mjs\" \"test/**/*.{js,mjs,ts}\" \"tools/**/*.mjs\" \"*.config.mjs\" \"*.json\"",
     "typecheck": "tsc --noEmit",
