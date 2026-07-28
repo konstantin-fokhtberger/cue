@@ -27,7 +27,7 @@ final class LiveCoreAudioCalls: CoreAudioCalls {
     description.isPrivate = true
     description.muteBehavior = .unmuted
     if #available(macOS 26.0, *) {
-      description.isProcessRestoreEnabled = false
+      description.setValue(false, forKey: "processRestoreEnabled")
     }
     var tapID = AudioObjectID(kAudioObjectUnknown)
     let status = AudioHardwareCreateProcessTap(description, &tapID)

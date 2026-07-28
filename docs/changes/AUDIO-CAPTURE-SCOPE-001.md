@@ -171,6 +171,10 @@ closed.
 - On macOS 26, CoreAudio process restoration is disabled. While capture is active, the helper
   periodically repeats live resolution and stops if the effective process set or route no longer
   matches.
+- The macOS 26 process-restoration property is assigned through its Objective-C runtime key so
+  the helper remains compilable with the older macOS SDK installed on the GitHub Actions runner.
+  Runtime availability is still guarded by `#available(macOS 26.0, *)`; there is no capture-scope
+  fallback.
 - The helper emits a sanitized `verified: true` effective scope. Electron rejects missing,
   unverified, extended, or mismatched metadata before accepting PCM for provider dispatch.
 - The renderer presents requested and effective scope separately. Capture cannot start without a
@@ -215,6 +219,9 @@ closed.
   decoding, fresh live resolution, nonempty inclusion IDs, selected-device-only aggregate input,
   sanitized effective metadata, and fail-closed scope revalidation.
 - CI and packaged evidence for this slice are pending the next pushed workflow run.
+- Regression for run 30380790580: the package job must compile the helper with the runner's older
+  SDK without directly referencing the macOS 26-only Swift property
+  `CATapDescription.isProcessRestoreEnabled`.
 
 ## Residual risks and follow-up
 
