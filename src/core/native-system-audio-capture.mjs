@@ -1,6 +1,7 @@
 import { spawn as nodeSpawn } from 'node:child_process';
 
 import { Float32Pcm16Resampler } from './float32-pcm16-resampler.mjs';
+import { encodeHelperCaptureConfiguration } from './helper-control-protocol.mjs';
 
 const MAXIMUM_PRESTART_BYTES = 1_048_576;
 
@@ -37,7 +38,13 @@ export class NativeSystemAudioCapture {
     this.#spawn = spawn;
   }
 
-  start() {
+  start(configuration) {
+    let controlMessage;
+    try {
+      controlMessage = encodeHelperCaptureConfiguration(configuration);
+    } catch {
+      return Promise.reject(new NativeSystemAudioCaptureError('invalid-capture-scope'));
+    }
     if (this.#active) {
       return Promise.resolve(this.#resource);
     }
@@ -49,22 +56,29 @@ export class NativeSystemAudioCapture {
     this.#generation = generation;
     this.#metrics = createMetrics();
     const child = this.#spawn(this.#helperPath, [], {
-      stdio: ['ignore', 'pipe', 'pipe'],
+      stdio: ['pipe', 'pipe', 'pipe'],
     });
     this.#child = child;
     this.#onState({ status: 'starting' });
-    this.#startPromise = new Promise((resolve, reject) => {
+    const startPromise = new Promise((resolve, reject) => {
       this.#pendingResolve = resolve;
       this.#pendingReject = reject;
     });
+    this.#startPromise = startPromise;
 
+    child.stdin.on('error', () => this.#fail(generation, 'helper-control-failed', true));
     child.stdout.on('data', (chunk) => this.#handleAudio(generation, chunk));
     child.stderr.on('data', (chunk) => this.#handleMetadata(generation, chunk));
     child.on('error', () => this.#fail(generation, 'helper-spawn-failed', false));
     child.on('exit', () => {
       this.#fail(generation, this.#active ? 'helper-exited' : 'helper-exited-before-start', false);
     });
-    return this.#startPromise;
+    try {
+      child.stdin.write(controlMessage);
+    } catch {
+      this.#fail(generation, 'helper-control-failed', true);
+    }
+    return startPromise;
   }
 
   stop() {
@@ -77,7 +91,7 @@ export class NativeSystemAudioCapture {
     this.#detach(child);
     const metrics = { ...this.#metrics };
     this.#reset();
-    child.kill('SIGTERM');
+    child.stdin.end();
     if (reject) {
       reject(new NativeSystemAudioCaptureError('start-cancelled'));
     }
@@ -140,18 +154,32 @@ export class NativeSystemAudioCapture {
       this.#fail(generation, 'unsupported-helper-format', true);
       return;
     }
+    if (
+      event.scope === null ||
+      typeof event.scope !== 'object' ||
+      event.scope.kind !== 'diagnostic-global' ||
+      event.scope.verified !== false ||
+      Object.keys(event.scope).length !== 2
+    ) {
+      this.#fail(generation, 'invalid-helper-scope', true);
+      return;
+    }
 
     this.#resampler = new Float32Pcm16Resampler({
       inputSampleRate: event.sampleRate,
       outputSampleRate: 16_000,
     });
     this.#active = true;
-    this.#resource = { inputSampleRate: event.sampleRate };
+    this.#resource = { inputSampleRate: event.sampleRate, scope: { ...event.scope } };
     const resolve = this.#pendingResolve;
     this.#pendingResolve = null;
     this.#pendingReject = null;
     this.#startPromise = null;
-    this.#onState({ status: 'active', inputSampleRate: event.sampleRate });
+    this.#onState({
+      status: 'diagnostic',
+      inputSampleRate: event.sampleRate,
+      scope: { ...event.scope },
+    });
     for (const audio of this.#prestartAudio) {
       this.#forwardPcm(audio);
     }
@@ -186,6 +214,8 @@ export class NativeSystemAudioCapture {
   }
 
   #detach(child) {
+    child.stdin.removeAllListeners();
+    child.stdin.on('error', ignoreDetachedStreamError);
     child.stdout.removeAllListeners();
     child.stderr.removeAllListeners();
     child.removeAllListeners();
@@ -204,6 +234,8 @@ export class NativeSystemAudioCapture {
     this.#stderrRemainder = '';
   }
 }
+
+function ignoreDetachedStreamError() {}
 
 function createMetrics() {
   return { chunks: 0, samples: 0, nonzero: 0, peak: 0 };

@@ -134,11 +134,30 @@ private final class FakeSession: AudioSession {
   }
 }
 
-private final class FakeTermination: TerminationWaiting {
+private final class FakeTermination: HelperControlling {
+  var configuration = HelperConfiguration(
+    protocolVersion: 1,
+    command: .capture,
+    scope: .diagnosticGlobal
+  )
+  var configurationError: Error?
+  var waitError: Error?
+  var readCount = 0
   var waitCount = 0
 
-  func wait() {
+  func readConfiguration() throws -> HelperConfiguration {
+    readCount += 1
+    if let configurationError {
+      throw configurationError
+    }
+    return configuration
+  }
+
+  func wait() throws {
     waitCount += 1
+    if let waitError {
+      throw waitError
+    }
   }
 }
 
@@ -163,6 +182,22 @@ final class HelperErrorTests: XCTestCase {
     XCTAssertEqual(
       HelperError.invalidState.description,
       "The audio tap session is already active."
+    )
+    XCTAssertEqual(
+      HelperError.controlClosed.description,
+      "The helper control channel closed before configuration."
+    )
+    XCTAssertEqual(
+      HelperError.controlMessageTooLarge.description,
+      "The helper control message exceeded its byte limit."
+    )
+    XCTAssertEqual(
+      HelperError.invalidControlMessage.description,
+      "The helper control message is invalid or unsupported."
+    )
+    XCTAssertEqual(
+      HelperError.unexpectedControlData.description,
+      "The helper control channel received unexpected data."
     )
   }
 }
@@ -525,8 +560,13 @@ final class HelperEventEncoderTests: XCTestCase {
 
   func testStartedEventIsSortedAndNewlineDelimited() throws {
     XCTAssertEqual(
-      String(decoding: try encoder.encodeLine(.started(sampleRate: 48_000)), as: UTF8.self),
-      "{\"channels\":1,\"event\":\"started\",\"format\":\"float32le\",\"sampleRate\":48000}\n"
+      String(
+        decoding: try encoder.encodeLine(
+          .started(sampleRate: 48_000, scope: .diagnosticGlobal)
+        ),
+        as: UTF8.self
+      ),
+      "{\"channels\":1,\"event\":\"started\",\"format\":\"float32le\",\"sampleRate\":48000,\"scope\":{\"kind\":\"diagnostic-global\",\"verified\":false}}\n"
     )
   }
 
@@ -585,14 +625,63 @@ final class HelperRunnerTests: XCTestCase {
     )
 
     XCTAssertEqual(runner.run(), 0)
+    XCTAssertEqual(termination.readCount, 1)
     XCTAssertEqual(termination.waitCount, 1)
     XCTAssertEqual(session.operations, ["start", "stop", "drain", "snapshot"])
     XCTAssertEqual(
       events,
       [
-        .started(sampleRate: 48_000),
+        .started(sampleRate: 48_000, scope: .diagnosticGlobal),
         .stopped(metrics: session.snapshotValue),
       ])
+  }
+
+  func testConfigurationFailurePreventsCaptureAndWritesTypedError() {
+    let session = FakeSession()
+    let termination = FakeTermination()
+    termination.configurationError = FixtureError.failed("configuration failed")
+    var events = [HelperEvent]()
+    let runner = HelperRunner(
+      session: session,
+      termination: termination,
+      encode: {
+        events.append($0)
+        return Data([1])
+      },
+      writeEvent: { _ in }
+    )
+
+    XCTAssertEqual(runner.run(), 1)
+    XCTAssertEqual(termination.readCount, 1)
+    XCTAssertEqual(termination.waitCount, 0)
+    XCTAssertEqual(session.operations, ["stop"])
+    XCTAssertEqual(events, [.error(message: "configuration failed")])
+  }
+
+  func testControlFailureAfterStartCleansUpAndWritesTypedError() {
+    let session = FakeSession()
+    let termination = FakeTermination()
+    termination.waitError = FixtureError.failed("control failed")
+    var events = [HelperEvent]()
+    let runner = HelperRunner(
+      session: session,
+      termination: termination,
+      encode: {
+        events.append($0)
+        return Data([1])
+      },
+      writeEvent: { _ in }
+    )
+
+    XCTAssertEqual(runner.run(), 1)
+    XCTAssertEqual(session.operations, ["start", "stop"])
+    XCTAssertEqual(
+      events,
+      [
+        .started(sampleRate: 48_000, scope: .diagnosticGlobal),
+        .error(message: "control failed"),
+      ]
+    )
   }
 
   func testStartFailureStopsAndWritesTypedError() {
@@ -643,7 +732,7 @@ final class HelperRunnerTests: XCTestCase {
     XCTAssertEqual(
       events,
       [
-        .started(sampleRate: 48_000),
+        .started(sampleRate: 48_000, scope: .diagnosticGlobal),
         .error(message: "write failed"),
       ])
     XCTAssertEqual(writeCount, 2)
@@ -673,7 +762,7 @@ final class HelperRunnerTests: XCTestCase {
     XCTAssertEqual(
       events,
       [
-        .started(sampleRate: 48_000),
+        .started(sampleRate: 48_000, scope: .diagnosticGlobal),
         .stopped(metrics: session.snapshotValue),
         .error(message: "encode failed"),
       ])

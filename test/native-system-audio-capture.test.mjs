@@ -7,6 +7,7 @@ import {
   NativeSystemAudioCapture,
   NativeSystemAudioCaptureError,
 } from '../src/core/native-system-audio-capture.mjs';
+import { DIAGNOSTIC_GLOBAL_CAPTURE } from '../src/core/helper-control-protocol.mjs';
 
 function floatBuffer(samples) {
   const buffer = Buffer.alloc(samples.length * 4);
@@ -16,8 +17,11 @@ function floatBuffer(samples) {
 
 function fakeChild() {
   const child = new EventEmitter();
+  child.stdin = new PassThrough();
   child.stdout = new PassThrough();
   child.stderr = new PassThrough();
+  const end = child.stdin.end.bind(child.stdin);
+  child.stdin.end = vi.fn((...arguments_) => end(...arguments_));
   child.kill = vi.fn(() => true);
   return child;
 }
@@ -40,13 +44,25 @@ function createHarness() {
   return { capture, children, onPcm, onState, spawn };
 }
 
-function startEvent(sampleRate = 48_000) {
+function startEvent(sampleRate = 48_000, scope = { kind: 'diagnostic-global', verified: false }) {
   return `${JSON.stringify({
     channels: 1,
     event: 'started',
     format: 'float32le',
     sampleRate,
+    scope,
   })}\n`;
+}
+
+function startDiagnostic(capture) {
+  return capture.start(DIAGNOSTIC_GLOBAL_CAPTURE);
+}
+
+function diagnosticResource(inputSampleRate) {
+  return {
+    inputSampleRate,
+    scope: { kind: 'diagnostic-global', verified: false },
+  };
 }
 
 describe('NativeSystemAudioCapture', () => {
@@ -62,7 +78,7 @@ describe('NativeSystemAudioCapture', () => {
 
   it('starts one helper, accepts fragmented metadata, and forwards exact resampled PCM', async () => {
     const harness = createHarness();
-    const started = harness.capture.start();
+    const started = startDiagnostic(harness.capture);
     const child = harness.children[0];
     const input = floatBuffer([0.1, 0.2, -1, 0.1, 0.2, 1]);
     child.stdout.write(input.subarray(0, 5));
@@ -70,15 +86,26 @@ describe('NativeSystemAudioCapture', () => {
     child.stderr.write(startEvent().slice(17));
     child.stdout.write(input.subarray(5));
 
-    await expect(started).resolves.toEqual({ inputSampleRate: 48_000 });
+    await expect(started).resolves.toEqual(diagnosticResource(48_000));
     expect(harness.spawn).toHaveBeenCalledWith(
       '/Applications/cue.app/Contents/Resources/cue-audio-tap-helper',
       [],
-      { stdio: ['ignore', 'pipe', 'pipe'] },
+      { stdio: ['pipe', 'pipe', 'pipe'] },
+    );
+    expect(child.stdin.read()).toEqual(
+      Buffer.from(
+        '{"command":"capture","protocolVersion":1,"scope":{"kind":"diagnostic-global"}}\n',
+      ),
     );
     expect(harness.onState.mock.calls).toEqual([
       [{ status: 'starting' }],
-      [{ status: 'active', inputSampleRate: 48_000 }],
+      [
+        {
+          status: 'diagnostic',
+          inputSampleRate: 48_000,
+          scope: { kind: 'diagnostic-global', verified: false },
+        },
+      ],
     ]);
     expect(Buffer.concat(harness.onPcm.mock.calls.map(([pcm]) => pcm))).toEqual(
       Buffer.from([0x00, 0x80, 0xff, 0x7f]),
@@ -87,14 +114,26 @@ describe('NativeSystemAudioCapture', () => {
 
   it('coalesces concurrent and active starts into one helper generation', async () => {
     const harness = createHarness();
-    const first = harness.capture.start();
-    const second = harness.capture.start();
+    const first = startDiagnostic(harness.capture);
+    const second = startDiagnostic(harness.capture);
     harness.children[0].stderr.write(startEvent());
 
     const resource = await first;
     await expect(second).resolves.toBe(resource);
-    await expect(harness.capture.start()).resolves.toBe(resource);
+    await expect(startDiagnostic(harness.capture)).resolves.toBe(resource);
     expect(harness.spawn).toHaveBeenCalledTimes(1);
+  });
+
+  it('rejects absent or unsupported scope before spawning a helper', async () => {
+    const harness = createHarness();
+
+    await expect(harness.capture.start()).rejects.toEqual(
+      new NativeSystemAudioCaptureError('invalid-capture-scope'),
+    );
+    await expect(harness.capture.start({ scope: { kind: 'application' } })).rejects.toEqual(
+      new NativeSystemAudioCaptureError('invalid-capture-scope'),
+    );
+    expect(harness.spawn).not.toHaveBeenCalled();
   });
 
   it.each([
@@ -130,9 +169,19 @@ describe('NativeSystemAudioCapture', () => {
       'unsupported-helper-format',
     ],
     ['explicit helper failure', '{"event":"error","message":"tap denied"}\n', 'helper-error'],
+    [
+      'missing effective scope',
+      `${JSON.stringify({
+        channels: 1,
+        event: 'started',
+        format: 'float32le',
+        sampleRate: 48_000,
+      })}\n`,
+      'invalid-helper-scope',
+    ],
   ])('rejects %s metadata and terminates the helper', async (_label, line, code) => {
     const harness = createHarness();
-    const started = harness.capture.start();
+    const started = startDiagnostic(harness.capture);
     harness.children[0].stderr.write(line);
 
     await expect(started).rejects.toMatchObject({
@@ -143,9 +192,25 @@ describe('NativeSystemAudioCapture', () => {
     expect(harness.onState).toHaveBeenLastCalledWith({ status: 'error', code });
   });
 
+  it.each([
+    null,
+    { kind: 'application', verified: false },
+    { kind: 'diagnostic-global', verified: true },
+    { kind: 'diagnostic-global', verified: false, extra: true },
+  ])('rejects invalid effective scope metadata %j independently', async (scope) => {
+    const harness = createHarness();
+    const started = startDiagnostic(harness.capture);
+
+    expect(() => harness.children[0].stderr.write(startEvent(48_000, scope))).not.toThrow();
+    await expect(started).rejects.toEqual(
+      new NativeSystemAudioCaptureError('invalid-helper-scope'),
+    );
+    expect(harness.children[0].kill).toHaveBeenCalledWith('SIGTERM');
+  });
+
   it('rejects process spawn errors and early exits with typed failures', async () => {
     const spawnFailure = createHarness();
-    const failedStart = spawnFailure.capture.start();
+    const failedStart = startDiagnostic(spawnFailure.capture);
     spawnFailure.children[0].emit('error', new Error('spawn failed'));
     await expect(failedStart).rejects.toEqual(
       new NativeSystemAudioCaptureError('helper-spawn-failed'),
@@ -154,7 +219,7 @@ describe('NativeSystemAudioCapture', () => {
     expect(spawnFailure.children[0].eventNames()).toEqual([]);
 
     const earlyExit = createHarness();
-    const exitedStart = earlyExit.capture.start();
+    const exitedStart = startDiagnostic(earlyExit.capture);
     earlyExit.children[0].emit('exit', 7, null);
     await expect(exitedStart).rejects.toEqual(
       new NativeSystemAudioCaptureError('helper-exited-before-start'),
@@ -163,9 +228,47 @@ describe('NativeSystemAudioCapture', () => {
     expect(earlyExit.children[0].eventNames()).toEqual([]);
   });
 
+  it('terminates the helper when the parent control pipe fails', async () => {
+    const harness = createHarness();
+    const started = startDiagnostic(harness.capture);
+    harness.children[0].stdin.emit('error', new Error('broken pipe'));
+
+    await expect(started).rejects.toEqual(
+      new NativeSystemAudioCaptureError('helper-control-failed'),
+    );
+    expect(harness.children[0].kill).toHaveBeenCalledWith('SIGTERM');
+    expect(harness.onState).toHaveBeenLastCalledWith({
+      status: 'error',
+      code: 'helper-control-failed',
+    });
+  });
+
+  it('returns a rejected Promise when the initial control write throws synchronously', async () => {
+    const child = fakeChild();
+    child.stdin.write = vi.fn(() => {
+      throw new Error('closed');
+    });
+    const onState = vi.fn();
+    const capture = new NativeSystemAudioCapture({
+      helperPath: '/helper',
+      onPcm: vi.fn(),
+      onState,
+      spawn: vi.fn(() => child),
+    });
+
+    await expect(startDiagnostic(capture)).rejects.toEqual(
+      new NativeSystemAudioCaptureError('helper-control-failed'),
+    );
+    expect(child.kill).toHaveBeenCalledWith('SIGTERM');
+    expect(onState).toHaveBeenLastCalledWith({
+      status: 'error',
+      code: 'helper-control-failed',
+    });
+  });
+
   it('bounds pre-start audio and rejects helper protocol overflow', async () => {
     const harness = createHarness();
-    const started = harness.capture.start();
+    const started = startDiagnostic(harness.capture);
     harness.children[0].stdout.write(Buffer.alloc(1_048_576));
     expect(harness.children[0].kill).not.toHaveBeenCalled();
     harness.children[0].stdout.write(Buffer.alloc(1));
@@ -181,7 +284,7 @@ describe('NativeSystemAudioCapture', () => {
 
   it('stops one active generation, emits idle, and ignores all late data', async () => {
     const harness = createHarness();
-    const started = harness.capture.start();
+    const started = startDiagnostic(harness.capture);
     const child = harness.children[0];
     child.stderr.write(startEvent());
     await started;
@@ -192,7 +295,9 @@ describe('NativeSystemAudioCapture', () => {
     child.stdout.write(floatBuffer([0, 0, 1]));
     child.emit('exit', 0, null);
 
-    expect(child.kill).toHaveBeenCalledWith('SIGTERM');
+    expect(child.stdin.end).toHaveBeenCalledTimes(1);
+    expect(child.kill).not.toHaveBeenCalled();
+    expect(() => child.stdin.emit('error', new Error('late pipe error'))).not.toThrow();
     expect(harness.onPcm).toHaveBeenCalledTimes(1);
     expect(harness.onState).toHaveBeenLastCalledWith({
       status: 'idle',
@@ -203,7 +308,7 @@ describe('NativeSystemAudioCapture', () => {
 
   it('ignores stale captured callbacks after cancellation', async () => {
     const harness = createHarness();
-    const started = harness.capture.start();
+    const started = startDiagnostic(harness.capture);
     const child = harness.children[0];
     const staleAudio = child.stdout.listeners('data')[0];
     const staleMetadata = child.stderr.listeners('data')[0];
@@ -212,14 +317,14 @@ describe('NativeSystemAudioCapture', () => {
     await harness.capture.stop();
     await expect(started).rejects.toEqual(new NativeSystemAudioCaptureError('start-cancelled'));
 
-    const current = harness.capture.start();
+    const current = startDiagnostic(harness.capture);
     staleAudio(floatBuffer([0, 0, 1]));
     staleMetadata(Buffer.from(startEvent(44_100)));
     staleError(new Error('late fixture error'));
     staleExit(0, null);
     expect(harness.onState).toHaveBeenLastCalledWith({ status: 'starting' });
     harness.children[1].stderr.write(startEvent(48_000));
-    await expect(current).resolves.toEqual({ inputSampleRate: 48_000 });
+    await expect(current).resolves.toEqual(diagnosticResource(48_000));
 
     expect(harness.onPcm).not.toHaveBeenCalled();
     expect(harness.onState).toHaveBeenCalledTimes(4);
@@ -227,7 +332,7 @@ describe('NativeSystemAudioCapture', () => {
 
   it('parses multiple helper events per chunk and ignores empty resampler output', async () => {
     const harness = createHarness();
-    const started = harness.capture.start();
+    const started = startDiagnostic(harness.capture);
     const child = harness.children[0];
     child.stderr.write(`{"event":"diagnostic"}\n${startEvent()}`);
     await started;
@@ -238,7 +343,7 @@ describe('NativeSystemAudioCapture', () => {
 
   it('stops parsing a metadata chunk immediately after a terminal event', async () => {
     const harness = createHarness();
-    const started = harness.capture.start();
+    const started = startDiagnostic(harness.capture);
     harness.children[0].stderr.write(`not-json\n${startEvent()}`);
 
     await expect(started).rejects.toEqual(
@@ -252,15 +357,15 @@ describe('NativeSystemAudioCapture', () => {
 
   it('accepts the exact 16 kHz helper format boundary', async () => {
     const harness = createHarness();
-    const started = harness.capture.start();
+    const started = startDiagnostic(harness.capture);
     harness.children[0].stderr.write(startEvent(16_000));
 
-    await expect(started).resolves.toEqual({ inputSampleRate: 16_000 });
+    await expect(started).resolves.toEqual(diagnosticResource(16_000));
   });
 
   it('reports aggregate signal metrics including silence and decreasing peaks', async () => {
     const harness = createHarness();
-    const started = harness.capture.start();
+    const started = startDiagnostic(harness.capture);
     const child = harness.children[0];
     child.stderr.write(startEvent());
     await started;
@@ -276,19 +381,19 @@ describe('NativeSystemAudioCapture', () => {
 
   it('cancels a pending start and permits a clean new generation', async () => {
     const harness = createHarness();
-    const obsolete = harness.capture.start();
+    const obsolete = startDiagnostic(harness.capture);
     await harness.capture.stop();
 
     await expect(obsolete).rejects.toEqual(new NativeSystemAudioCaptureError('start-cancelled'));
-    const current = harness.capture.start();
+    const current = startDiagnostic(harness.capture);
     harness.children[1].stderr.write(startEvent(44_100));
-    await expect(current).resolves.toEqual({ inputSampleRate: 44_100 });
+    await expect(current).resolves.toEqual(diagnosticResource(44_100));
     expect(harness.spawn).toHaveBeenCalledTimes(2);
   });
 
   it('reports an unexpected active-helper exit without forwarding post-exit data', async () => {
     const harness = createHarness();
-    const started = harness.capture.start();
+    const started = startDiagnostic(harness.capture);
     const child = harness.children[0];
     child.stderr.write(startEvent());
     await started;

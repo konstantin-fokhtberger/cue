@@ -11,6 +11,7 @@ const execute = promisify(execFile);
 const projectRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const packageDirectory = path.join(projectRoot, 'native', 'audio-tap-helper');
 const coreRelativePath = path.join('Sources', 'CueAudioTapCore', 'HelperCore.swift');
+const controlRelativePath = path.join('Sources', 'CueAudioTapCore', 'HelperControl.swift');
 const platformRelativePath = path.join(
   'Sources',
   'CueAudioTapPlatform',
@@ -191,7 +192,7 @@ const coreMutations = [
   },
   {
     id: 'runner-waits-for-termination',
-    from: 'termination.wait()',
+    from: 'try termination.wait()',
     to: '_ = termination',
   },
   {
@@ -208,6 +209,53 @@ const coreMutations = [
     id: 'runner-error-code',
     from: 'return 1',
     to: 'return 2',
+  },
+];
+const controlMutations = [
+  {
+    id: 'control-version-one-required',
+    from: 'version == 1,',
+    to: 'version >= 1,',
+  },
+  {
+    id: 'control-command-required',
+    from: 'let command = HelperCommand(rawValue: commandValue),',
+    to: 'let command = HelperCommand(rawValue: "capture"),',
+  },
+  {
+    id: 'control-scope-required',
+    from: 'scopeKind == "diagnostic-global"',
+    to: 'scopeKind != "diagnostic-global"',
+  },
+  {
+    id: 'control-message-bound-inclusive',
+    from: 'line.count <= maximumMessageBytes',
+    to: 'line.count < maximumMessageBytes',
+  },
+  {
+    id: 'control-buffer-bound-inclusive',
+    from: 'buffer.count <= maximumMessageBytes',
+    to: 'buffer.count < maximumMessageBytes',
+  },
+  {
+    id: 'control-rejects-trailing-data',
+    from: 'guard buffer.index(after: newline) == buffer.endIndex else {',
+    to: 'guard true else {',
+  },
+  {
+    id: 'control-rejects-post-configuration-data',
+    from: 'guard completedLine == nil else {',
+    to: 'guard true else {',
+  },
+  {
+    id: 'control-eof-before-configuration-fails',
+    from: 'guard !chunk.isEmpty else {\n        throw HelperError.controlClosed\n      }\n      line = try framer.accept(chunk)',
+    to: 'guard !chunk.isEmpty else {\n        throw HelperError.invalidControlMessage\n      }\n      line = try framer.accept(chunk)',
+  },
+  {
+    id: 'control-eof-after-configuration-stops',
+    from: 'guard chunk.isEmpty else {',
+    to: 'guard !chunk.isEmpty else {',
   },
 ];
 const platformMutations = [
@@ -349,6 +397,10 @@ const platformMutations = [
 ];
 const mutations = [
   ...coreMutations.map((mutation) => ({ ...mutation, relativePath: coreRelativePath })),
+  ...controlMutations.map((mutation) => ({
+    ...mutation,
+    relativePath: controlRelativePath,
+  })),
   ...platformMutations.map((mutation) => ({
     ...mutation,
     relativePath: platformRelativePath,
@@ -389,7 +441,7 @@ if (!(await runSwift(packageDirectory, ['test']))) {
 
 const sourceByRelativePath = new Map(
   await Promise.all(
-    [coreRelativePath, platformRelativePath].map(async (relativePath) => [
+    [coreRelativePath, controlRelativePath, platformRelativePath].map(async (relativePath) => [
       relativePath,
       await readFile(path.join(packageDirectory, relativePath), 'utf8'),
     ]),

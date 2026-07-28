@@ -274,23 +274,39 @@ import { appendFileSync } from 'node:fs';
 
 const logPath = process.env.CUE_E2E_AUDIO_HELPER_LOG;
 const mode = process.env.CUE_E2E_AUDIO_HELPER_MODE || 'healthy';
-appendFileSync(logPath, 'start\\n');
-if (mode === 'initialization-failed') {
-  process.stderr.write('{"event":"error","message":"fixture failure"}\\n');
-  process.exit(1);
-}
 const frame = Buffer.alloc(48 * 4);
 for (let index = 0; index < 48; index += 1) frame.writeFloatLE(index % 2 ? 0.25 : -0.25, index * 4);
 let timer;
+let started = false;
 const stop = () => {
+  if (!started) process.exit(0);
+  started = false;
   clearInterval(timer);
   appendFileSync(logPath, 'stop\\n');
   process.exit(0);
 };
 process.on('SIGTERM', stop);
 process.on('SIGINT', stop);
-process.stderr.write('{"channels":1,"event":"started","format":"float32le","sampleRate":48000}\\n');
-timer = setInterval(() => process.stdout.write(frame), 5);
+let control = '';
+process.stdin.setEncoding('utf8');
+process.stdin.on('data', (chunk) => {
+  control += chunk;
+  const newline = control.indexOf('\\n');
+  if (newline === -1) return;
+  if (newline !== control.length - 1) process.exit(2);
+  const expected = '{"command":"capture","protocolVersion":1,"scope":{"kind":"diagnostic-global"}}';
+  if (control.slice(0, newline) !== expected) process.exit(2);
+  started = true;
+  appendFileSync(logPath, 'start\\n');
+  if (mode === 'initialization-failed') {
+    process.stderr.write('{"event":"error","message":"fixture failure"}\\n');
+    process.exit(1);
+  }
+  process.stderr.write('{"channels":1,"event":"started","format":"float32le","sampleRate":48000,"scope":{"kind":"diagnostic-global","verified":false}}\\n');
+  timer = setInterval(() => process.stdout.write(frame), 5);
+});
+process.stdin.on('end', stop);
+process.stdin.resume();
 `;
 }
 
@@ -363,6 +379,9 @@ async function launchCue(microphoneMode, fixtureOptions = {}) {
       } finally {
         await rm(temporaryRoot, { recursive: true, force: true });
       }
+    },
+    async cleanup() {
+      await rm(temporaryRoot, { recursive: true, force: true });
     },
   };
 }
@@ -475,6 +494,33 @@ test(
 );
 
 test(
+  'E2E-HELPER-PARENT-DEATH-001 closes helper control stdin after abrupt Electron exit',
+  { timeout: 10_000 },
+  async () => {
+    const fixture = await launchCue('healthy');
+    let parentKilled = false;
+    try {
+      await fixture.page.locator('#s-close').click();
+      await fixture.page.locator('#stop-btn').click();
+      await waitForHelperEventCount(fixture, 1);
+
+      assert.equal(fixture.electronApp.process().kill('SIGKILL'), true);
+      parentKilled = true;
+      await waitForHelperEventCount(fixture, 2);
+
+      assert.deepEqual(await fixture.helperEvents(), ['start', 'stop']);
+      assert.deepEqual(fixture.networkRequests, []);
+    } finally {
+      if (parentKilled) {
+        await fixture.cleanup();
+      } else {
+        await fixture.close();
+      }
+    }
+  },
+);
+
+test(
   'E2E-SYSTEM-DEGRADED-001 / E2E-SYSTEM-FAIL-SINGLE-001 reports one system failure while microphone remains active',
   { timeout: 10_000 },
   async () => {
@@ -578,7 +624,7 @@ test(
       await fixture.page.locator('#stop-btn').click();
       await fixture.page.waitForFunction(() => window.__cueE2eAudio.pendingMediaRequestCount === 1);
       await fixture.page.waitForFunction(
-        () => document.documentElement.dataset.systemCaptureStatus === 'active',
+        () => document.documentElement.dataset.systemCaptureStatus === 'diagnostic',
       );
       await fixture.page.evaluate(() => window.__cueE2eAudio.resolvePendingMediaRequests());
       await fixture.page.waitForFunction(
@@ -596,7 +642,7 @@ test(
       await fixture.page.locator('#stop-btn').click();
       await fixture.page.waitForFunction(() => window.__cueE2eAudio.pendingMediaRequestCount === 1);
       await fixture.page.waitForFunction(
-        () => document.documentElement.dataset.systemCaptureStatus === 'active',
+        () => document.documentElement.dataset.systemCaptureStatus === 'diagnostic',
       );
       await fixture.page.evaluate(() => window.__cueE2eAudio.resolvePendingMediaRequests());
       await fixture.page.waitForFunction(
@@ -652,7 +698,7 @@ test(
               button.classList.contains('active') &&
               window.__cueE2eAudio.createdContextCount === cycle &&
               window.__cueE2eAudio.activeWorkletCount === 1 &&
-              document.documentElement.dataset.systemCaptureStatus === 'active',
+              document.documentElement.dataset.systemCaptureStatus === 'diagnostic',
           );
           button.click();
           await waitUntil(

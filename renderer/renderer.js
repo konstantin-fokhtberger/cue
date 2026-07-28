@@ -305,6 +305,8 @@ import { systemCaptureFailureMessage } from '../src/core/system-capture-status.m
     document.documentElement.dataset.systemCaptureStatus = status;
     if (status === 'active') {
       setSystemCaptureHealthy();
+    } else if (status === 'diagnostic') {
+      setSystemCaptureFailure('unverified-capture-scope');
     } else if (status === 'error') {
       setSystemCaptureFailure(code || 'initialization-failed');
     }

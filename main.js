@@ -19,6 +19,9 @@ const { BoundedPcmBuffer } = require('./src/core/bounded-pcm-buffer');
 let win = null;
 let registeredAssistShortcut = null;
 let systemAudioCapture = null;
+let systemAudioCaptureConfiguration = null;
+let systemAudioCaptureScope = null;
+let canDispatchSystemPcm = () => false;
 
 const DEFAULT_ASSIST_SHORTCUT = 'CommandOrControl+Return';
 const RESERVED_SHORTCUTS = new Set([
@@ -140,7 +143,7 @@ function setCapturing(active) {
   state.capturing = active;
   if (active) {
     startFlushLoop();
-    systemAudioCapture?.start().catch((error) => {
+    systemAudioCapture?.start(systemAudioCaptureConfiguration).catch((error) => {
       console.log('[cue] system audio start failed:', error && error.code);
     });
   } else {
@@ -277,6 +280,9 @@ app.whenReady().then(async () => {
   session.defaultSession.setPermissionCheckHandler((_wc, permission) => allowMedia(permission));
 
   const { NativeSystemAudioCapture } = await import('./src/core/native-system-audio-capture.mjs');
+  const { DIAGNOSTIC_GLOBAL_CAPTURE } = await import('./src/core/helper-control-protocol.mjs');
+  ({ canDispatchSystemPcm } = await import('./src/core/capture-scope-policy.mjs'));
+  systemAudioCaptureConfiguration = DIAGNOSTIC_GLOBAL_CAPTURE;
   const helperPath =
     e2eRuntime.enabled && process.env.CUE_E2E_AUDIO_HELPER_PATH
       ? process.env.CUE_E2E_AUDIO_HELPER_PATH
@@ -286,9 +292,12 @@ app.whenReady().then(async () => {
   systemAudioCapture = new NativeSystemAudioCapture({
     helperPath,
     onPcm: (pcm) => {
-      if (state.capturing) buffers.them.push(pcm);
+      if (state.capturing && canDispatchSystemPcm(systemAudioCaptureScope)) {
+        buffers.them.push(pcm);
+      }
     },
     onState: (captureState) => {
+      systemAudioCaptureScope = captureState.scope || null;
       if (captureState.status === 'idle' && captureState.metrics) {
         console.log('[cue] system audio stopped', JSON.stringify(captureState.metrics));
       }

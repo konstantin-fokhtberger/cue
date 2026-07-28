@@ -6,6 +6,10 @@ public enum HelperError: Error, CustomStringConvertible, Equatable {
   case missingOutputDevice
   case unsupportedFormat
   case invalidState
+  case controlClosed
+  case controlMessageTooLarge
+  case invalidControlMessage
+  case unexpectedControlData
 
   public var description: String {
     switch self {
@@ -19,6 +23,14 @@ public enum HelperError: Error, CustomStringConvertible, Equatable {
       return "The tap did not provide mono Float32 linear PCM."
     case .invalidState:
       return "The audio tap session is already active."
+    case .controlClosed:
+      return "The helper control channel closed before configuration."
+    case .controlMessageTooLarge:
+      return "The helper control message exceeded its byte limit."
+    case .invalidControlMessage:
+      return "The helper control message is invalid or unsupported."
+    case .unexpectedControlData:
+      return "The helper control channel received unexpected data."
     }
   }
 }
@@ -275,7 +287,7 @@ public final class AudioTapSession: AudioSession {
 }
 
 public enum HelperEvent: Equatable {
-  case started(sampleRate: Double)
+  case started(sampleRate: Double, scope: CaptureScope)
   case stopped(metrics: SignalSnapshot)
   case error(message: String)
 }
@@ -286,12 +298,16 @@ public struct HelperEventEncoder {
   public func encodeLine(_ event: HelperEvent) throws -> Data {
     let object: [String: Any]
     switch event {
-    case .started(let sampleRate):
+    case .started(let sampleRate, let scope):
       object = [
         "channels": 1,
         "event": "started",
         "format": "float32le",
         "sampleRate": sampleRate,
+        "scope": [
+          "kind": scope.kind,
+          "verified": false,
+        ],
       ]
     case .stopped(let metrics):
       object = [
@@ -312,19 +328,15 @@ public struct HelperEventEncoder {
   }
 }
 
-public protocol TerminationWaiting {
-  func wait()
-}
-
 public final class HelperRunner {
   private let session: AudioSession
-  private let termination: TerminationWaiting
+  private let termination: HelperControlling
   private let encode: (HelperEvent) throws -> Data
   private let writeEvent: (Data) throws -> Void
 
   public init(
     session: AudioSession,
-    termination: TerminationWaiting,
+    termination: HelperControlling,
     encode: @escaping (HelperEvent) throws -> Data = HelperEventEncoder().encodeLine,
     writeEvent: @escaping (Data) throws -> Void
   ) {
@@ -336,9 +348,10 @@ public final class HelperRunner {
 
   public func run() -> Int32 {
     do {
+      let configuration = try termination.readConfiguration()
       let sampleRate = try session.start()
-      try writeEvent(encode(.started(sampleRate: sampleRate)))
-      termination.wait()
+      try writeEvent(encode(.started(sampleRate: sampleRate, scope: configuration.scope)))
+      try termination.wait()
       session.stop()
       session.drain()
       try writeEvent(encode(.stopped(metrics: session.snapshot())))

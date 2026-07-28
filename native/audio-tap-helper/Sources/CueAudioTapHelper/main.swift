@@ -3,8 +3,7 @@ import CueAudioTapPlatform
 import Darwin
 import Foundation
 
-private final class SignalTerminationWaiter: TerminationWaiting {
-  private let stopped = DispatchSemaphore(value: 0)
+private final class SignalControlBridge {
   private let terminateSource: DispatchSourceSignal
   private let interruptSource: DispatchSourceSignal
 
@@ -13,17 +12,17 @@ private final class SignalTerminationWaiter: TerminationWaiting {
     signal(SIGINT, SIG_IGN)
     terminateSource = DispatchSource.makeSignalSource(signal: SIGTERM)
     interruptSource = DispatchSource.makeSignalSource(signal: SIGINT)
-    terminateSource.setEventHandler { [stopped] in stopped.signal() }
-    interruptSource.setEventHandler { [stopped] in stopped.signal() }
+    terminateSource.setEventHandler { Darwin.close(STDIN_FILENO) }
+    interruptSource.setEventHandler { Darwin.close(STDIN_FILENO) }
     terminateSource.resume()
     interruptSource.resume()
   }
-
-  func wait() {
-    stopped.wait()
-  }
 }
 
+private let signalBridge = SignalControlBridge()
+private let control = StreamHelperControl(
+  readChunk: { FileHandle.standardInput.availableData }
+)
 private let writerQueue = DispatchQueue(label: "com.cue.audio-tap-helper.stdout")
 private let writer = BoundedSignalWriter(
   scheduleWrite: { operation in writerQueue.async(execute: operation) },
@@ -37,8 +36,10 @@ private let session = AudioTapSession(
 )
 private let runner = HelperRunner(
   session: session,
-  termination: SignalTerminationWaiter(),
+  termination: control,
   writeEvent: { FileHandle.standardError.write($0) }
 )
 
-exit(runner.run())
+withExtendedLifetime(signalBridge) {
+  exit(runner.run())
+}

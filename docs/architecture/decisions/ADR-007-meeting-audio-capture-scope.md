@@ -176,3 +176,15 @@ browser-wide capture is unacceptable.
 
 The accurate browser-wide label and explicit user acknowledgement remain mandatory acceptance
 conditions, not optional UX enhancements.
+
+## Implementation resolution
+
+The selected application instance is identified by the responsible application PID plus its
+bundle ID for one inventory generation. CoreAudio helper processes are attributed through bounded
+parent-process ancestry. Bundle-ID-only matching is prohibited because it can merge multiple
+browser instances.
+
+If the responsible process exits or restarts, the effective scope becomes stale and capture stops.
+The new PID is not selected automatically; the user must refresh inventory and explicitly start
+the new instance. This fail-closed restore policy is intentionally stricter than automatic
+re-resolution and avoids binding a meeting session to the wrong application instance.
