@@ -48,6 +48,29 @@ Excluded by default:
 
 No other exclusion is automatic.
 
+### Swift helper gate
+
+The native CoreAudio helper is project-owned production logic and is not covered by the
+JavaScript/V8 report.
+
+Before `ADR-006` can be treated as release-ready, `TEST-NATIVE-AUDIO-001` must:
+
+1. Extract CoreAudio orchestration, protocol encoding, buffer bounds, and cleanup into testable
+   Swift modules with injected platform operations.
+2. Run Swift tests with coverage instrumentation and enforce 100% line, statement, function, and
+   branch coverage.
+3. If the Swift/LLVM toolchain has no native statement metric, implement a deterministic
+   executable-region equivalent. Reclassifying line coverage as statement coverage without
+   evidence is prohibited.
+4. Mutation-test lifecycle, protocol, bounds, and cleanup logic at a 100% score. If no reliable
+   Swift mutator supports the code, an exact limitation and replacement fault-injection gate
+   require explicit owner approval under the normal exclusion policy.
+5. Keep real CoreAudio/TCC and process-lifecycle acceptance on the target Mac because structural
+   coverage cannot prove platform behavior.
+
+The current JavaScript 100% report must never be described as whole-product coverage while the
+Swift helper remains outside this gate.
+
 ## 4. Mutation policy
 
 Critical modules require a 100% mutation score:

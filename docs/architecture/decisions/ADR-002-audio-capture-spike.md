@@ -17,7 +17,10 @@ The repository uses Electron 33 and a loopback configuration that is not a relia
 
 ## Decision
 
-Run a bounded feasibility spike using a supported Electron version. Accept Electron only if the complete application, route, lifecycle, and packaged-build matrix passes. Otherwise adopt a Swift ScreenCaptureKit helper behind the same `SystemAudioCapturePort`.
+Run a bounded feasibility spike using a supported Electron version. Accept Electron only if the
+complete application, route, lifecycle, and packaged-build matrix passes. Otherwise adopt a native
+Swift helper behind the same `SystemAudioCapturePort`; choose its concrete macOS API in the
+evidence-based follow-up ADR.
 
 ## Acceptance evidence
 
@@ -30,3 +33,10 @@ Run a bounded feasibility spike using a supported Electron version. Accept Elect
 ## Consequences
 
 The spike is not throwaway code. It must use the proposed capture port and produce reusable tests, but it must not trigger the full architecture migration before feasibility is known.
+
+## Outcome
+
+The spike is complete. Electron audio-only capture did not satisfy the permission and routing
+criteria. `ADR-006` accepts a Swift CoreAudio Process Tap helper behind
+`SystemAudioCapturePort`. The remaining route, process-scope, parent-death, Swift coverage, and
+meeting-application tests are release gates, not reasons to retain the failed Electron backend.

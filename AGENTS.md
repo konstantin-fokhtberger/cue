@@ -53,8 +53,9 @@ Runtime changes without a requirement, acceptance criteria, and test evidence ar
 ## Architecture constraints
 
 - macOS only for the first product version.
-- Prefer a modern Electron/CoreAudio Tap implementation first.
-- Introduce a Swift ScreenCaptureKit helper only if the audio feasibility spike proves the Electron path insufficient.
+- Use the signed Swift CoreAudio Process Tap helper selected by ADR-006 behind `SystemAudioCapturePort`.
+- Do not restore Electron display-media or ScreenCaptureKit as an automatic Meeting-mode fallback.
+- Treat Swift coverage, parent-death cleanup, and capture-scope privacy as P0 release blockers.
 - Keep microphone and system audio as separate streams.
 - Treat remote participant identification as diarization over a mixed system-audio stream.
 - Use an explicit capture session state machine and generation/cancellation tokens.

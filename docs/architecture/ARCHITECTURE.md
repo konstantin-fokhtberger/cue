@@ -2,7 +2,10 @@
 
 ## 1. Status
 
-This target architecture is accepted. The Electron audio path must still pass the feasibility spike before its concrete capture adapter is accepted.
+This target architecture is accepted. `ADR-006` selects a signed Swift CoreAudio Process Tap
+helper as the macOS `SystemAudioCapturePort` implementation. Backend selection does not imply
+release readiness; Swift coverage, parent-death cleanup, capture-scope privacy, and the remaining
+target-Mac lifecycle matrix are explicit P0 gates.
 
 ## 2. Architecture drivers
 
@@ -81,26 +84,46 @@ Rules:
 
 ## 6. Audio capture decision
 
-### Preferred path
+### Selected path
 
-Upgrade to a supported Electron version and validate CoreAudio Tap based desktop audio capture on macOS 26.5.2.
+Use a signed Swift CoreAudio Process Tap helper behind `SystemAudioCapturePort`.
 
-### Fallback path
+```text
+CoreAudio Process Tap
+        |
+signed Swift helper
+  stdout: Float32LE mono PCM
+  stderr: validated JSON lifecycle events
+        |
+Electron main adapter
+  generation gate
+  bounded pre-start buffer
+  16 kHz PCM16 resampling
+        |
+AudioPipeline(system channel)
+```
 
-Introduce a signed Swift helper using ScreenCaptureKit only if the preferred path fails an accepted feasibility criterion.
+Microphone capture remains a separate Electron media path. Meeting Start does not enumerate
+screen sources, and ScreenCaptureKit is not an automatic fallback.
 
-### Decision gate
+### Release gate
 
-The capture adapter is accepted only after:
+Architecture selection is complete, but release acceptance additionally requires:
 
-- Zoom, Teams, and Meet pass;
-- built-in, Bluetooth-headset, and USB-microphone/Bluetooth-output routes pass;
-- aligned and meeting-app-override device configurations pass without inferring one
-  configuration layer from another;
-- dead-stream detection passes;
-- 100 repeated Start/Stop cycles pass;
-- sleep/wake and route-change behavior is characterized;
-- packaged execution outside the development environment passes.
+- 100% automated structural coverage for project-owned Swift helper logic;
+- helper termination and CoreAudio cleanup after parent-process death;
+- an accepted bounded capture-scope policy that excludes cue playback and prevents unrelated
+  system audio from reaching STT without consent;
+- available Zoom, Teams, and Meet evidence without inferring one configuration layer from
+  another;
+- built-in, Bluetooth-headset, and USB-microphone/Bluetooth-output route evidence;
+- dead-stream detection and recovery;
+- 100 repeated Start/Stop cycles;
+- sleep/wake, route-change, and disconnect/reconnect characterization;
+- packaged execution outside the development environment.
+
+Microsoft Teams is waived only for the current manual spike because no test conference is
+available. It remains an unverified release requirement.
 
 ## 7. Transcription strategy
 

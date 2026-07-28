@@ -8,61 +8,61 @@
 
 ## Initial matrix
 
-| Requirement    | Backlog                                          | Planned automated evidence                                              | Status   |
-| -------------- | ------------------------------------------------ | ----------------------------------------------------------------------- | -------- |
-| FR-SESSION-001 | ARCH-SESSION-001                                 | UT-SESSION-001, AT-SESSION-001                                          | planned  |
-| FR-SESSION-002 | ARCH-SESSION-001                                 | PT-SESSION-001, MT-SESSION-001                                          | planned  |
-| FR-SESSION-003 | ARCH-SESSION-001, TEST-AUDIO-002                 | AT-SESSION-STOP-001, RT-MAC-STOP-001                                    | planned  |
-| FR-SESSION-004 | ARCH-SESSION-001                                 | UT-SESSION-RACE-001, MT-SESSION-002                                     | planned  |
-| FR-SESSION-005 | ARCH-TIMELINE-001                                | AT-SESSION-BOUNDARY-001, MT-TIMELINE-001                                | planned  |
-| FR-SESSION-006 | TEST-AUDIO-002                                   | RT-MAC-RECOVERY-001                                                     | planned  |
-| FR-AUDIO-001   | SPIKE-AUDIO-001, TEST-AUDIO-001, AUDIO-DIAG-001  | CT-CAPTURE-MIC-001, CT-AUDIO-DIAG-001, RT-MAC-HYPERX-DIAG-001           | planned  |
-| FR-AUDIO-002   | SPIKE-AUDIO-001, BUG-AUDIO-002, TEST-AUDIO-002   | UT-DISPLAY-MEDIA-POLICY-001, E2E-SYSTEM-DEGRADED-001, RT-MAC-APPS-001   | planned  |
-| FR-AUDIO-003   | SPIKE-AUDIO-001                                  | RT-MAC-SELF-AUDIO-001                                                   | planned  |
-| FR-AUDIO-004   | SPIKE-AUDIO-001, BUG-AUDIO-002, AUDIO-DIAG-001   | UT-CAPTURE-HEALTH-001, E2E-SYSTEM-DEGRADED-001, RT-MAC-DEAD-001         | planned  |
-| FR-AUDIO-005   | TEST-AUDIO-001                                   | PT-AUDIO-BOUNDS-001, MT-AUDIO-001                                       | planned  |
-| FR-AUDIO-006   | TEST-AUDIO-002                                   | RT-MAC-ROUTES-001                                                       | planned  |
-| FR-AUDIO-007   | SPIKE-AUDIO-001, TEST-AUDIO-002                  | RT-MAC-USB-BT-001, RT-MAC-APPS-USB-BT-001                               | planned  |
-| FR-AUDIO-008   | ADR-DEVICE-001, AUDIO-DEVICE-001, AUDIO-DIAG-001 | CT-AUDIO-DEVICE-POLICY-001, E2E-AUDIO-DIAG-001, RT-MAC-HYPERX-DIAG-001  | verified |
-| FR-AUDIO-009   | ADR-DEVICE-001, AUDIO-DEVICE-001, AUDIO-DIAG-001 | CT-AUDIO-OUTPUT-POLICY-001, CT-AUDIO-DIAG-SINK-001, RT-MAC-SONY-OUT-001 | verified |
-| FR-STT-001     | STT-001                                          | CT-STT-CHANNELS-001                                                     | planned  |
-| FR-STT-002     | STT-001                                          | AT-STT-YOU-001                                                          | planned  |
-| FR-STT-003     | STT-002                                          | AT-DIARIZATION-001, EVAL-DIARIZATION-001                                | planned  |
-| FR-STT-004     | ARCH-PROVIDER-001                                | UT-PROVIDER-SELECT-001, MT-PROVIDER-001                                 | planned  |
-| FR-STT-005     | ARCH-PROVIDER-001                                | AT-PROVIDER-NO-FALLBACK-001, MT-PROVIDER-002                            | planned  |
-| FR-STT-006     | STT-001, ARCH-TIMELINE-001                       | UT-TIMELINE-PARTIAL-001                                                 | planned  |
-| FR-STT-007     | ARCH-TIMELINE-001                                | PT-TIMELINE-ORDER-001, MT-TIMELINE-002                                  | planned  |
-| FR-MEET-001    | MEET-002                                         | E2E-MEET-REPLY-001                                                      | planned  |
-| FR-MEET-002    | MEET-003                                         | E2E-MEET-FOLLOWUP-001                                                   | planned  |
-| FR-MEET-003    | MEET-004                                         | E2E-MEET-RECAP-001, EVAL-RECAP-001                                      | planned  |
-| FR-MEET-004    | MEET-005                                         | E2E-SPEAKER-RENAME-001                                                  | planned  |
-| FR-MEET-005    | MEET-001                                         | E2E-ATTACHMENTS-001                                                     | planned  |
-| FR-SHELL-001   | UI-WINDOW-001                                    | CT-WINDOW-DRAG-REGION-001, RT-MAC-MULTIDISPLAY-DRAG-001                 | planned  |
-| FR-SHELL-002   | UI-MENUBAR-001                                   | CT-MENUBAR-CLOSE-001, E2E-MENUBAR-SHUTDOWN-001, RT-MAC-MENUBAR-001      | planned  |
-| FR-INT-001     | INT-001                                          | E2E-INTERVIEW-PROFILE-001                                               | planned  |
-| FR-INT-002     | INT-001                                          | AT-CONTEXT-BOUNDARY-001                                                 | planned  |
-| FR-CODE-001    | CODE-001                                         | E2E-SCREEN-EXPLICIT-001                                                 | planned  |
-| FR-CODE-002    | CODE-001                                         | EVAL-CODING-001                                                         | planned  |
-| FR-PRIV-001    | SEC-KEYCHAIN-001                                 | IT-KEYCHAIN-001, SCAN-SECRETS-001                                       | planned  |
-| FR-PRIV-002    | MEET-001                                         | E2E-STATUS-001                                                          | planned  |
-| FR-PRIV-003    | DEC-004, ARCH-TIMELINE-001                       | AT-RETENTION-001, MT-RETENTION-001                                      | planned  |
-| FR-PRIV-004    | ARCH-TIMELINE-001                                | AT-CLEAR-001                                                            | planned  |
-| FR-PRIV-005    | SEC-IPC-001                                      | PT-ERROR-REDACTION-001, MT-REDACTION-001                                | planned  |
-| FR-PRIV-006    | BUG-AUDIO-003                                    | CT-MEETING-NO-SCREEN-SOURCE-001, RT-MAC-MEET-NO-SCREEN-TCC-001          | verified |
-| NFR-REL-001    | ARCH-SESSION-001, TEST-AUDIO-002                 | STRESS-SESSION-100-001                                                  | planned  |
-| NFR-REL-002    | ARCH-SESSION-001                                 | FUZZ-SESSION-EVENTS-001                                                 | planned  |
-| NFR-TEST-001   | TOOL-001, CI-001                                 | CI-COVERAGE-001                                                         | planned  |
-| NFR-TEST-002   | TOOL-001, CI-001                                 | CI-MUTATION-001                                                         | planned  |
-| NFR-TEST-003   | CI-001                                           | CI-TRACEABILITY-001                                                     | planned  |
-| NFR-SEC-001    | SEC-IPC-001                                      | CT-IPC-001, PT-IPC-NEGATIVE-001                                         | planned  |
-| NFR-SEC-002    | BUG-PKG-001, PKG-001                             | PKG-TCC-IDENTITY-001, PKG-GATEKEEPER-001                                | planned  |
-| NFR-SEC-003    | BUG-PKG-001                                      | UT-MAC-SIGNING-POLICY-001, PKG-TCC-IDENTITY-001                         | verified |
-| NFR-PERF-001   | TEST-AUDIO-002                                   | PERF-STOP-001                                                           | planned  |
-| NFR-PERF-002   | STT-001                                          | PERF-STT-001                                                            | planned  |
-| NFR-PERF-003   | MEET-002                                         | PERF-SUGGESTION-001                                                     | planned  |
-| NFR-RES-001    | REL-001                                          | SOAK-4H-001                                                             | planned  |
-| NFR-OBS-001    | BUG-AUDIO-002, REL-001                           | E2E-SYSTEM-FAIL-SINGLE-001, AT-DIAGNOSTICS-001, SCAN-LOGS-001           | planned  |
-| NFR-COMP-001   | BUG-AUDIO-002, TEST-AUDIO-002                    | UT-DISPLAY-MEDIA-POLICY-001, ENV-TARGET-MAC-001                         | planned  |
+| Requirement    | Backlog                                                       | Planned automated evidence                                              | Status   |
+| -------------- | ------------------------------------------------------------- | ----------------------------------------------------------------------- | -------- |
+| FR-SESSION-001 | ARCH-SESSION-001                                              | UT-SESSION-001, AT-SESSION-001                                          | planned  |
+| FR-SESSION-002 | ARCH-SESSION-001                                              | PT-SESSION-001, MT-SESSION-001                                          | planned  |
+| FR-SESSION-003 | ARCH-SESSION-001, TEST-AUDIO-002                              | AT-SESSION-STOP-001, RT-MAC-STOP-001                                    | planned  |
+| FR-SESSION-004 | ARCH-SESSION-001                                              | UT-SESSION-RACE-001, MT-SESSION-002                                     | planned  |
+| FR-SESSION-005 | ARCH-TIMELINE-001                                             | AT-SESSION-BOUNDARY-001, MT-TIMELINE-001                                | planned  |
+| FR-SESSION-006 | TEST-AUDIO-002                                                | RT-MAC-RECOVERY-001                                                     | planned  |
+| FR-AUDIO-001   | SPIKE-AUDIO-001, TEST-AUDIO-001, AUDIO-DIAG-001               | CT-CAPTURE-MIC-001, CT-AUDIO-DIAG-001, RT-MAC-HYPERX-DIAG-001           | planned  |
+| FR-AUDIO-002   | SPIKE-AUDIO-001, ADR-AUDIO-001, BUG-AUDIO-002, TEST-AUDIO-002 | UT-NATIVE-SYSTEM-AUDIO-001, E2E-SYSTEM-DEGRADED-001, RT-MAC-APPS-001    | planned  |
+| FR-AUDIO-003   | ADR-CAPTURE-SCOPE-001                                         | CT-CAPTURE-SCOPE-001, RT-MAC-SELF-AUDIO-001                             | planned  |
+| FR-AUDIO-004   | SPIKE-AUDIO-001, BUG-AUDIO-002, AUDIO-DIAG-001                | UT-CAPTURE-HEALTH-001, E2E-SYSTEM-DEGRADED-001, RT-MAC-DEAD-001         | planned  |
+| FR-AUDIO-005   | TEST-AUDIO-001                                                | PT-AUDIO-BOUNDS-001, MT-AUDIO-001                                       | planned  |
+| FR-AUDIO-006   | TEST-AUDIO-002                                                | RT-MAC-ROUTES-001                                                       | planned  |
+| FR-AUDIO-007   | SPIKE-AUDIO-001, TEST-AUDIO-002                               | RT-MAC-USB-BT-001, RT-MAC-APPS-USB-BT-001                               | planned  |
+| FR-AUDIO-008   | ADR-DEVICE-001, AUDIO-DEVICE-001, AUDIO-DIAG-001              | CT-AUDIO-DEVICE-POLICY-001, E2E-AUDIO-DIAG-001, RT-MAC-HYPERX-DIAG-001  | verified |
+| FR-AUDIO-009   | ADR-DEVICE-001, AUDIO-DEVICE-001, AUDIO-DIAG-001              | CT-AUDIO-OUTPUT-POLICY-001, CT-AUDIO-DIAG-SINK-001, RT-MAC-SONY-OUT-001 | verified |
+| FR-STT-001     | STT-001                                                       | CT-STT-CHANNELS-001                                                     | planned  |
+| FR-STT-002     | STT-001                                                       | AT-STT-YOU-001                                                          | planned  |
+| FR-STT-003     | STT-002                                                       | AT-DIARIZATION-001, EVAL-DIARIZATION-001                                | planned  |
+| FR-STT-004     | ARCH-PROVIDER-001                                             | UT-PROVIDER-SELECT-001, MT-PROVIDER-001                                 | planned  |
+| FR-STT-005     | ARCH-PROVIDER-001                                             | AT-PROVIDER-NO-FALLBACK-001, MT-PROVIDER-002                            | planned  |
+| FR-STT-006     | STT-001, ARCH-TIMELINE-001                                    | UT-TIMELINE-PARTIAL-001                                                 | planned  |
+| FR-STT-007     | ARCH-TIMELINE-001                                             | PT-TIMELINE-ORDER-001, MT-TIMELINE-002                                  | planned  |
+| FR-MEET-001    | MEET-002                                                      | E2E-MEET-REPLY-001                                                      | planned  |
+| FR-MEET-002    | MEET-003                                                      | E2E-MEET-FOLLOWUP-001                                                   | planned  |
+| FR-MEET-003    | MEET-004                                                      | E2E-MEET-RECAP-001, EVAL-RECAP-001                                      | planned  |
+| FR-MEET-004    | MEET-005                                                      | E2E-SPEAKER-RENAME-001                                                  | planned  |
+| FR-MEET-005    | MEET-001                                                      | E2E-ATTACHMENTS-001                                                     | planned  |
+| FR-SHELL-001   | UI-WINDOW-001                                                 | CT-WINDOW-DRAG-REGION-001, RT-MAC-MULTIDISPLAY-DRAG-001                 | planned  |
+| FR-SHELL-002   | UI-MENUBAR-001                                                | CT-MENUBAR-CLOSE-001, E2E-MENUBAR-SHUTDOWN-001, RT-MAC-MENUBAR-001      | planned  |
+| FR-INT-001     | INT-001                                                       | E2E-INTERVIEW-PROFILE-001                                               | planned  |
+| FR-INT-002     | INT-001                                                       | AT-CONTEXT-BOUNDARY-001                                                 | planned  |
+| FR-CODE-001    | CODE-001                                                      | E2E-SCREEN-EXPLICIT-001                                                 | planned  |
+| FR-CODE-002    | CODE-001                                                      | EVAL-CODING-001                                                         | planned  |
+| FR-PRIV-001    | SEC-KEYCHAIN-001                                              | IT-KEYCHAIN-001, SCAN-SECRETS-001                                       | planned  |
+| FR-PRIV-002    | MEET-001                                                      | E2E-STATUS-001                                                          | planned  |
+| FR-PRIV-003    | DEC-004, ARCH-TIMELINE-001                                    | AT-RETENTION-001, MT-RETENTION-001                                      | planned  |
+| FR-PRIV-004    | ARCH-TIMELINE-001                                             | AT-CLEAR-001                                                            | planned  |
+| FR-PRIV-005    | SEC-IPC-001                                                   | PT-ERROR-REDACTION-001, MT-REDACTION-001                                | planned  |
+| FR-PRIV-006    | BUG-AUDIO-003                                                 | CT-MEETING-NO-SCREEN-SOURCE-001, RT-MAC-MEET-NO-SCREEN-TCC-001          | verified |
+| NFR-REL-001    | ARCH-SESSION-001, TEST-AUDIO-002                              | STRESS-SESSION-100-001                                                  | planned  |
+| NFR-REL-002    | ARCH-SESSION-001, BUG-AUDIO-004                               | FUZZ-SESSION-EVENTS-001, E2E-HELPER-PARENT-DEATH-001                    | planned  |
+| NFR-TEST-001   | TOOL-001, CI-001, TEST-NATIVE-AUDIO-001                       | CI-COVERAGE-001, CI-SWIFT-COVERAGE-001                                  | planned  |
+| NFR-TEST-002   | TOOL-001, CI-001, TEST-NATIVE-AUDIO-001                       | CI-MUTATION-001, CI-SWIFT-MUTATION-001                                  | planned  |
+| NFR-TEST-003   | CI-001                                                        | CI-TRACEABILITY-001                                                     | planned  |
+| NFR-SEC-001    | SEC-IPC-001, ADR-CAPTURE-SCOPE-001                            | CT-IPC-001, PT-IPC-NEGATIVE-001, CT-CAPTURE-SCOPE-001                   | planned  |
+| NFR-SEC-002    | BUG-PKG-001, PKG-001                                          | PKG-TCC-IDENTITY-001, PKG-GATEKEEPER-001                                | planned  |
+| NFR-SEC-003    | BUG-PKG-001                                                   | UT-MAC-SIGNING-POLICY-001, PKG-TCC-IDENTITY-001                         | verified |
+| NFR-PERF-001   | TEST-AUDIO-002                                                | PERF-STOP-001                                                           | planned  |
+| NFR-PERF-002   | STT-001                                                       | PERF-STT-001                                                            | planned  |
+| NFR-PERF-003   | MEET-002                                                      | PERF-SUGGESTION-001                                                     | planned  |
+| NFR-RES-001    | REL-001                                                       | SOAK-4H-001                                                             | planned  |
+| NFR-OBS-001    | BUG-AUDIO-002, REL-001                                        | E2E-SYSTEM-FAIL-SINGLE-001, AT-DIAGNOSTICS-001, SCAN-LOGS-001           | planned  |
+| NFR-COMP-001   | BUG-AUDIO-002, TEST-AUDIO-002                                 | UT-DISPLAY-MEDIA-POLICY-001, ENV-TARGET-MAC-001                         | planned  |
 
 ## Implemented quality controls
 

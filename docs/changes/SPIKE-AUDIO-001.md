@@ -6,7 +6,7 @@
 | --------------- | ------------------------------------------ |
 | Backlog ID      | SPIKE-AUDIO-001                            |
 | Requirement IDs | FR-AUDIO-001, 002, 003, 004, 006, 007, 008 |
-| Status          | in progress                                |
+| Status          | done                                       |
 | Owner           | project maintainer                         |
 | Target revision | `spike/SPIKE-AUDIO-001-electron-capture`   |
 
@@ -160,6 +160,8 @@ or introduces a native Swift helper.
   TCC identity.
 - Package: Electron 43.2.0 and electron-builder 26.15.3 produce an arm64 app containing the
   expected bundle identifier and audio-capture usage description.
+- Architecture decision: `ADR-006` accepts the signed Swift CoreAudio Process Tap helper behind
+  `SystemAudioCapturePort`; Electron display-media capture is rejected for Meeting mode.
 
 ## Residual risks and follow-up
 

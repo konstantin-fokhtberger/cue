@@ -27,11 +27,12 @@ Prove reliable separate microphone and system-audio capture on the target Mac.
 - Zoom, Teams, and Meet.
 - Built-in and Bluetooth routes.
 - Repeated lifecycle and sleep/wake behavior.
-- Swift ScreenCaptureKit fallback decision.
+- Native CoreAudio Process Tap backend decision.
 
 ### Exit gate
 
-ADR-002 is accepted or replaced based on recorded evidence.
+`ADR-006` accepts the capture backend. Remaining Swift coverage, parent-death, capture-scope,
+route, sleep/wake, and meeting-application risks have explicit backlog disposition.
 
 ## Phase 2: Testable foundation
 
