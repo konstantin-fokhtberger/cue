@@ -6,7 +6,7 @@
 | --------------- | ---------------------------------------- |
 | Backlog ID      | TEST-NATIVE-AUDIO-001                    |
 | Requirement IDs | NFR-TEST-001, NFR-TEST-002, FR-AUDIO-002 |
-| Status          | in_progress                              |
+| Status          | done                                     |
 | Owner           | project maintainer                       |
 | Target revision | `spike/SPIKE-AUDIO-001-electron-capture` |
 
@@ -133,8 +133,9 @@ coverage and mutation gate.
 
 ## Verification evidence
 
-- CI: [Pull request quality run 30353488390](https://github.com/konstantin-fokhtberger/cue/actions/runs/30353488390)
-  passed `quality`, the native Swift structural/mutation step, packaging, and packaged E2E.
+- CI: [Pull request quality run 30355978609](https://github.com/konstantin-fokhtberger/cue/actions/runs/30355978609)
+  passed `quality` in 2m21s and `package-macos-arm64` in 6m22s, including the native Swift
+  structural/mutation step, packaging, and packaged E2E.
 - Coverage: `CueAudioTapCore` reports 246/246 lines, 32/32 functions, 33/33 instantiations, and
   86/86 executable regions. `CoreAudioTapPlatform` reports 152/152 lines, 23/23 functions, 23/23
   instantiations, and 58/58 executable regions. Swift/LLVM reports zero branch records.
@@ -155,4 +156,3 @@ coverage and mutation gate.
 - `LiveCoreAudioCalls.swift` and the executable composition/signal root are not structurally
   instrumented. They are deliberately limited to direct CoreAudio/Darwin calls and raw pointer
   marshalling; their behavior remains dependent on package and target-Mac evidence.
-- GitHub-hosted acceptance for the changed 65-mutant gate is still pending.
