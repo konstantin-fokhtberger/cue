@@ -25,6 +25,7 @@
 | FR-AUDIO-007   | SPIKE-AUDIO-001, TEST-AUDIO-002                               | RT-MAC-USB-BT-001, RT-MAC-APPS-USB-BT-001                               | planned  |
 | FR-AUDIO-008   | ADR-DEVICE-001, AUDIO-DEVICE-001, AUDIO-DIAG-001              | CT-AUDIO-DEVICE-POLICY-001, E2E-AUDIO-DIAG-001, RT-MAC-HYPERX-DIAG-001  | verified |
 | FR-AUDIO-009   | ADR-DEVICE-001, AUDIO-DEVICE-001, AUDIO-DIAG-001              | CT-AUDIO-OUTPUT-POLICY-001, CT-AUDIO-DIAG-SINK-001, RT-MAC-SONY-OUT-001 | verified |
+| FR-AUDIO-010   | ADR-CAPTURE-SCOPE-001, AUDIO-CAPTURE-SCOPE-001                | CT-CAPTURE-SCOPE-001, E2E-CAPTURE-SCOPE-001, RT-MAC-APP-SCOPE-001       | planned  |
 | FR-STT-001     | STT-001                                                       | CT-STT-CHANNELS-001                                                     | planned  |
 | FR-STT-002     | STT-001                                                       | AT-STT-YOU-001                                                          | planned  |
 | FR-STT-003     | STT-002                                                       | AT-DIARIZATION-001, EVAL-DIARIZATION-001                                | planned  |
@@ -49,6 +50,7 @@
 | FR-PRIV-004    | ARCH-TIMELINE-001                                             | AT-CLEAR-001                                                            | planned  |
 | FR-PRIV-005    | SEC-IPC-001                                                   | PT-ERROR-REDACTION-001, MT-REDACTION-001                                | planned  |
 | FR-PRIV-006    | BUG-AUDIO-003                                                 | CT-MEETING-NO-SCREEN-SOURCE-001, RT-MAC-MEET-NO-SCREEN-TCC-001          | verified |
+| FR-PRIV-007    | ADR-CAPTURE-SCOPE-001, AUDIO-CAPTURE-SCOPE-001                | CT-NO-GLOBAL-STT-001, E2E-BROWSER-SCOPE-DISCLOSURE-001                  | planned  |
 | NFR-REL-001    | ARCH-SESSION-001, TEST-AUDIO-002                              | STRESS-SESSION-100-001                                                  | planned  |
 | NFR-REL-002    | ARCH-SESSION-001, BUG-AUDIO-004                               | FUZZ-SESSION-EVENTS-001, E2E-HELPER-PARENT-DEATH-001                    | planned  |
 | NFR-TEST-001   | TOOL-001, CI-001, TEST-NATIVE-AUDIO-001                       | CI-COVERAGE-001, CI-SWIFT-COVERAGE-001                                  | planned  |

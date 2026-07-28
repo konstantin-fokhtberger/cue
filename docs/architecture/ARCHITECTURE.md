@@ -106,14 +106,23 @@ AudioPipeline(system channel)
 Microphone capture remains a separate Electron media path. Meeting Start does not enumerate
 screen sources, and ScreenCaptureKit is not an automatic fallback.
 
+Production system-audio capture follows the accepted `ADR-007` scope policy:
+
+- the user explicitly selects one application scope;
+- Chrome means all audible tabs in the selected browser instance and is labeled accordingly;
+- starting browser-wide capture requires explicit acknowledgement;
+- global capture is diagnostic-only and cannot dispatch audio to STT;
+- absent, ambiguous, or stale scope fails closed without a global fallback;
+- exact Chrome tab capture through an extension is deferred.
+
 ### Release gate
 
 Architecture selection is complete, but release acceptance additionally requires:
 
 - 100% automated structural coverage for project-owned Swift helper logic;
 - helper termination and CoreAudio cleanup after parent-process death;
-- an accepted bounded capture-scope policy that excludes cue playback and prevents unrelated
-  system audio from reaching STT without consent;
+- implemented and tested application-scoped capture that excludes cue playback, discloses
+  browser-wide Chrome scope, and prevents global system audio from reaching STT;
 - available Zoom, Teams, and Meet evidence without inferring one configuration layer from
   another;
 - built-in, Bluetooth-headset, and USB-microphone/Bluetooth-output route evidence;

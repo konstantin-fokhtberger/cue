@@ -34,7 +34,7 @@
 | FR-AUDIO-007 |       P1 | accepted | A separate USB microphone works with Bluetooth output               | HyperX SoloCast input and Sony Bluetooth output retain separate microphone/system PCM and pass the accepted meeting-app matrix                                                                                      |
 | FR-AUDIO-008 |       P0 | accepted | cue selects and reports its microphone independently                | With macOS default input set to Sony and the meeting app set to HyperX, cue can explicitly open HyperX and reports the effective device; without an explicit selection, the displayed fallback is the macOS default |
 | FR-AUDIO-009 |       P0 | accepted | cue selects and reports its playback output independently           | cue applies the exact selected output sink to cue-owned playback, displays requested/effective output, and states that meeting-app output must be selected separately                                               |
-| FR-AUDIO-010 |       P0 | proposed | cue captures system audio from an explicit application scope        | Production STT accepts system PCM only from the requested and verified application scope; missing or ambiguous scope never falls back to the global mix                                                             |
+| FR-AUDIO-010 |       P0 | accepted | cue captures system audio from an explicit application scope        | Production STT accepts system PCM only from the requested and verified application scope; missing or ambiguous scope never falls back to the global mix                                                             |
 
 ### Transcription and diarization
 
@@ -84,7 +84,7 @@
 | FR-PRIV-004 |       P1 | accepted | Clear session data on request                           | Clear operation removes all locally retained artifacts and reports completion                                                            |
 | FR-PRIV-005 |       P1 | accepted | Sanitize provider errors                                | Error UI and logs contain no keys, raw requests, audio, transcript, or professional context                                              |
 | FR-PRIV-006 |       P0 | accepted | Request capture permissions only for the active feature | Meeting audio never requests screen capture; screen permission is requested only after explicit screen/coding invocation                 |
-| FR-PRIV-007 |       P0 | proposed | Prevent unrelated application audio from reaching STT   | Global diagnostic capture cannot dispatch to a provider; browser-wide scope requires an explicit accurate label and user acknowledgement |
+| FR-PRIV-007 |       P0 | accepted | Prevent unrelated application audio from reaching STT   | Global diagnostic capture cannot dispatch to a provider; browser-wide scope requires an explicit accurate label and user acknowledgement |
 
 ## 3. Non-functional requirements
 

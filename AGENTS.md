@@ -55,6 +55,9 @@ Runtime changes without a requirement, acceptance criteria, and test evidence ar
 - macOS only for the first product version.
 - Use the signed Swift CoreAudio Process Tap helper selected by ADR-006 behind `SystemAudioCapturePort`.
 - Do not restore Electron display-media or ScreenCaptureKit as an automatic Meeting-mode fallback.
+- Use explicit application-scoped system-audio capture in production. Chrome scope is browser-wide
+  and must be labeled accurately with explicit acknowledgement; diagnostic global audio never
+  reaches a provider or STT.
 - Treat Swift coverage, parent-death cleanup, and capture-scope privacy as P0 release blockers.
 - Keep microphone and system audio as separate streams.
 - Treat remote participant identification as diarization over a mixed system-audio stream.

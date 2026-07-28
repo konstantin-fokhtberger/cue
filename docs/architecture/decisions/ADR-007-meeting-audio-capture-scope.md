@@ -1,6 +1,6 @@
 # ADR-007: explicit meeting-application audio capture scope
 
-- Status: Proposed
+- Status: Accepted
 - Date: 2026-07-28
 - Backlog ID: `ADR-CAPTURE-SCOPE-001`
 - Depends on: `ADR-006`
@@ -54,7 +54,7 @@ tab-level isolation for Google Meet.
 | ScreenCaptureKit window/tab selection  | Window/process-dependent screen capture | Reintroduces screen permission                    | User-facing picker and screen indicator                  | High               |
 | Virtual audio device                   | User-routed applications                | Deterministic after correct manual routing        | Driver install and fragile daily route management        | High               |
 
-## Proposed decision
+## Decision
 
 Use explicit CoreAudio application scope as the default production policy.
 
@@ -84,7 +84,7 @@ It must not be labeled `Google Meet only`.
 Starting this scope requires explicit acknowledgement that another audible Chrome tab can enter
 the transcript. cue should recommend pausing or muting other tabs during the meeting.
 
-## Alternative requiring owner decision
+## Deferred alternative
 
 If browser-wide capture is unacceptable, implement a second adapter using a Chrome extension and
 `chrome.tabCapture`:
@@ -167,11 +167,12 @@ complexity compared with introducing a second IPC channel.
   the CoreAudio resolver and must not be collected for this policy.
 - Global diagnostic mode visibly disables provider dispatch.
 
-## Open decision
+## Decision resolution
 
-Does the first Meeting MVP accept browser-wide Chrome audio with an explicit warning, or require
-exact Google Meet tab isolation through a Chrome extension?
+On 2026-07-28, the product owner accepted browser-wide Chrome capture for the first Meeting MVP.
+Exact Google Meet tab isolation through a Chrome extension is deferred. The decision should be
+reopened only if real contamination evidence or an operational requirement shows that
+browser-wide capture is unacceptable.
 
-The recommended first implementation is explicit application scope, with the Chrome extension
-deferred until real contamination evidence shows that browser-wide capture is operationally
-unacceptable.
+The accurate browser-wide label and explicit user acknowledgement remain mandatory acceptance
+conditions, not optional UX enhancements.
