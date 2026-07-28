@@ -130,7 +130,8 @@ retains a copy of the pipe writer.
 
 ## Verification evidence
 
-- CI: pending.
+- CI: run `30363532849` passed both `quality` and `package-macos-arm64`, including packaged E2E
+  9/9.
 - Coverage: local `npm run test:swift` passed with 100% functions, instantiations, lines, and
   regions for `HelperCore.swift`, `HelperControl.swift`, and `CoreAudioTapPlatform.swift`.
 - Mutation: local `npm run test:swift:mutation` killed 74/74 viable mutants; 0 survived and 0
