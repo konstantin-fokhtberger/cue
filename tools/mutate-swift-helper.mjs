@@ -11,9 +11,14 @@ const execute = promisify(execFile);
 const projectRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const packageDirectory = path.join(projectRoot, 'native', 'audio-tap-helper');
 const coreRelativePath = path.join('Sources', 'CueAudioTapCore', 'HelperCore.swift');
+const platformRelativePath = path.join(
+  'Sources',
+  'CueAudioTapPlatform',
+  'CoreAudioTapPlatform.swift',
+);
 const environment = await swiftEnvironment();
 
-const mutations = [
+const coreMutations = [
   {
     id: 'format-linear-pcm-required',
     from: 'guard isLinearPCM, isFloat, bitsPerChannel == 32, channelsPerFrame == 1,',
@@ -205,6 +210,150 @@ const mutations = [
     to: 'return 2',
   },
 ];
+const platformMutations = [
+  {
+    id: 'platform-process-unknown-filter',
+    from: 'for processID in processIDs where processID != 0 {',
+    to: 'for processID in processIDs where true {',
+  },
+  {
+    id: 'platform-running-output-required',
+    from: 'running != 0',
+    to: 'running == 0',
+  },
+  {
+    id: 'platform-device-unknown-filter',
+    from: 'discovered.filter { $0 != 0 }',
+    to: 'discovered.filter { _ in true }',
+  },
+  {
+    id: 'platform-default-fallback-required',
+    from: 'if deviceIDs.isEmpty {',
+    to: 'if false {',
+  },
+  {
+    id: 'platform-default-unknown-filter',
+    from: 'if defaultID != 0 {',
+    to: 'if true {',
+  },
+  {
+    id: 'platform-device-id-deduplication',
+    from: 'for deviceID in deviceIDs where seenDeviceIDs.insert(deviceID).inserted {',
+    to: 'for deviceID in deviceIDs where true {',
+  },
+  {
+    id: 'platform-empty-uid-filter',
+    from: 'if !uid.isEmpty, seenUIDs.insert(uid).inserted {',
+    to: 'if true, seenUIDs.insert(uid).inserted {',
+  },
+  {
+    id: 'platform-uid-deduplication',
+    from: 'if !uid.isEmpty, seenUIDs.insert(uid).inserted {',
+    to: 'if !uid.isEmpty, true {',
+  },
+  {
+    id: 'platform-aggregate-main-device',
+    from: 'mainSubdeviceUID: mainSubdeviceUID,',
+    to: 'mainSubdeviceUID: outputDeviceUIDs.last!,',
+  },
+  {
+    id: 'platform-drift-compensation',
+    from: 'AggregateSubdevicePlan(uid: uid, driftCompensation: index != 0)',
+    to: 'AggregateSubdevicePlan(uid: uid, driftCompensation: true)',
+  },
+  {
+    id: 'platform-aggregate-privacy',
+    from: 'isPrivate: true,',
+    to: 'isPrivate: false,',
+  },
+  {
+    id: 'platform-callback-enabled-after-create',
+    from: 'setCallbackActive(true)\n    } catch {',
+    to: 'setCallbackActive(false)\n    } catch {',
+  },
+  {
+    id: 'platform-callback-disabled-after-create-failure',
+    from: '} catch {\n      setCallbackActive(false)\n      throw error',
+    to: '} catch {\n      setCallbackActive(true)\n      throw error',
+  },
+  {
+    id: 'platform-callback-disabled-after-destroy',
+    from: 'public func destroyIO(aggregateID: UInt32) {\n    setCallbackActive(false)',
+    to: 'public func destroyIO(aggregateID: UInt32) {\n    setCallbackActive(true)',
+  },
+  {
+    id: 'platform-inactive-callback-filter',
+    from: 'guard ioCallbackActive, let buffers else {',
+    to: 'guard true, let buffers else {',
+  },
+  {
+    id: 'platform-null-buffer-filter',
+    from: 'for data in buffers.compactMap({ $0 }) {',
+    to: 'for data in buffers.compactMap({ _ in Data() }) {',
+  },
+  {
+    id: 'platform-malformed-payload-filter',
+    from: 'if let payload = AudioPayload(float32LE: data) {',
+    to: 'if let payload = AudioPayload(float32LE: Data()) {',
+  },
+  {
+    id: 'platform-create-tap-error-contract',
+    from: 'try require(calls.createTap(), operation: "AudioHardwareCreateProcessTap")',
+    to: 'try require(calls.createTap(), operation: "create tap")',
+  },
+  {
+    id: 'platform-tap-uid-error-contract',
+    from: 'operation: "AudioObjectGetPropertyData(tap UID)"',
+    to: 'operation: "tap UID"',
+  },
+  {
+    id: 'platform-tap-format-error-contract',
+    from: 'operation: "AudioObjectGetPropertyData(tap format)"',
+    to: 'operation: "tap format"',
+  },
+  {
+    id: 'platform-aggregate-error-contract',
+    from: 'operation: "AudioHardwareCreateAggregateDevice"',
+    to: 'operation: "create aggregate"',
+  },
+  {
+    id: 'platform-create-io-error-contract',
+    from: 'try require(result, operation: "AudioDeviceCreateIOProcID")',
+    to: 'try require(result, operation: "create IO")',
+  },
+  {
+    id: 'platform-start-error-contract',
+    from: 'operation: "AudioDeviceStart"',
+    to: 'operation: "start IO"',
+  },
+  {
+    id: 'platform-stop-forwarding',
+    from: 'calls.stopIO(aggregateID: aggregateID)',
+    to: '_ = aggregateID',
+  },
+  {
+    id: 'platform-destroy-io-forwarding',
+    from: 'calls.destroyIO(aggregateID: aggregateID)',
+    to: '_ = aggregateID',
+  },
+  {
+    id: 'platform-destroy-aggregate-forwarding',
+    from: 'calls.destroyAggregate(aggregateID)',
+    to: '_ = aggregateID',
+  },
+  {
+    id: 'platform-destroy-tap-forwarding',
+    from: 'calls.destroyTap(tapID)',
+    to: '_ = tapID',
+  },
+];
+const mutations = [
+  ...coreMutations.map((mutation) => ({ ...mutation, relativePath: coreRelativePath })),
+  ...platformMutations.map((mutation) => ({
+    ...mutation,
+    relativePath: platformRelativePath,
+  })),
+];
 
 function replaceExactlyOnce(source, mutation) {
   const firstIndex = source.indexOf(mutation.from);
@@ -238,7 +387,14 @@ if (!(await runSwift(packageDirectory, ['test']))) {
   throw new Error('Swift mutation baseline tests failed.');
 }
 
-const source = await readFile(path.join(packageDirectory, coreRelativePath), 'utf8');
+const sourceByRelativePath = new Map(
+  await Promise.all(
+    [coreRelativePath, platformRelativePath].map(async (relativePath) => [
+      relativePath,
+      await readFile(path.join(packageDirectory, relativePath), 'utf8'),
+    ]),
+  ),
+);
 const rootTemporaryDirectory = await mkdtemp(path.join(os.tmpdir(), 'cue-swift-mutation-'));
 const results = [];
 try {
@@ -248,8 +404,12 @@ try {
     filter: (sourcePath) => !sourcePath.includes(`${path.sep}.build${path.sep}`),
   });
   for (const mutation of mutations) {
+    for (const [relativePath, source] of sourceByRelativePath) {
+      await writeFile(path.join(mutantDirectory, relativePath), source);
+    }
+    const source = sourceByRelativePath.get(mutation.relativePath);
     await writeFile(
-      path.join(mutantDirectory, coreRelativePath),
+      path.join(mutantDirectory, mutation.relativePath),
       replaceExactlyOnce(source, mutation),
     );
     const viable = await runSwift(mutantDirectory, ['build']);

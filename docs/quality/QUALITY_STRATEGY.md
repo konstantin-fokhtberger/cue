@@ -68,12 +68,23 @@ Before `ADR-006` can be treated as release-ready, `TEST-NATIVE-AUDIO-001` must:
 5. Keep real CoreAudio/TCC and process-lifecycle acceptance on the target Mac because structural
    coverage cannot prove platform behavior.
 
-The JavaScript 100% report and the `CueAudioTapCore` 100% line/function/instantiation/region report
-must never be combined or described as whole-product coverage. Swift/LLVM currently emits no
-native branch records for this package, so branch-equivalent evidence requires the accepted
-condition mutation gate. The executable CoreAudio binding and signal bootstrap remain outside the
-structural test binary; accepting that exact boundary as platform glue requires explicit owner
-approval and does not replace live target-Mac evidence.
+The JavaScript 100% report and the Swift 100% line/function/instantiation/region report must never
+be combined or described as whole-product coverage. Swift/LLVM currently emits no native branch
+records for this package, so branch-equivalent evidence requires the accepted condition mutation
+gate.
+
+The mandatory Swift structural scope is exact and fail-closed:
+
+- `Sources/CueAudioTapCore/HelperCore.swift`;
+- `Sources/CueAudioTapPlatform/CoreAudioTapPlatform.swift`.
+
+The gate fails if either file disappears or if a new core/platform production file is not
+classified explicitly. `LiveCoreAudioCalls.swift` is the accepted direct platform boundary: it
+contains CoreAudio property calls, raw C callback/pointer marshalling, and no product fallback,
+provider, capture-scope, or retention policy. The executable `main.swift` is the composition and
+Darwin signal boundary. These two files require compile/package/signing, packaged E2E, and
+target-Mac CoreAudio lifecycle evidence; this classification does not convert their live behavior
+into structurally proven behavior.
 
 ## 4. Mutation policy
 

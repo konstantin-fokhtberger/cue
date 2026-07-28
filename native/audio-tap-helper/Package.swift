@@ -10,13 +10,19 @@ let package = Package(
   platforms: [.macOS(.v15)],
   products: [
     .library(name: "CueAudioTapCore", targets: ["CueAudioTapCore"]),
+    .library(name: "CueAudioTapPlatform", targets: ["CueAudioTapPlatform"]),
     .executable(name: "cue-audio-tap-helper", targets: ["CueAudioTapHelper"]),
   ],
   targets: [
     .target(name: "CueAudioTapCore"),
+    .target(
+      name: "CueAudioTapPlatform",
+      dependencies: ["CueAudioTapCore"],
+      linkerSettings: [.linkedFramework("CoreAudio")]
+    ),
     .executableTarget(
       name: "CueAudioTapHelper",
-      dependencies: ["CueAudioTapCore"],
+      dependencies: ["CueAudioTapCore", "CueAudioTapPlatform"],
       linkerSettings: [
         .linkedFramework("CoreAudio"),
         .unsafeFlags([
@@ -28,6 +34,10 @@ let package = Package(
       ]
     ),
     .testTarget(name: "CueAudioTapCoreTests", dependencies: ["CueAudioTapCore"]),
+    .testTarget(
+      name: "CueAudioTapPlatformTests",
+      dependencies: ["CueAudioTapCore", "CueAudioTapPlatform"]
+    ),
   ],
   swiftLanguageModes: [.v5]
 )

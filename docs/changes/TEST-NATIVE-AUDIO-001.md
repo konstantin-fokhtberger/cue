@@ -6,7 +6,7 @@
 | --------------- | ---------------------------------------- |
 | Backlog ID      | TEST-NATIVE-AUDIO-001                    |
 | Requirement IDs | NFR-TEST-001, NFR-TEST-002, FR-AUDIO-002 |
-| Status          | blocked                                  |
+| Status          | in_progress                              |
 | Owner           | project maintainer                       |
 | Target revision | `spike/SPIKE-AUDIO-001-electron-capture` |
 
@@ -32,14 +32,17 @@ coverage and mutation gate.
 ## Assumptions
 
 - The GitHub macOS arm64 runner has the repository-selected Swift toolchain and `llvm-cov`.
-- Acceptance of a deterministic reviewed mutation manifest and the exact structural coverage
-  boundary remains an explicit owner decision.
+- The product owner accepted an injectable CoreAudio facade with only direct Apple API and pointer
+  marshalling left at the live platform boundary.
 
 ## Scope
 
 - Introduce a SwiftPM package for the helper.
 - Extract protocol, format, buffer-bound, lifecycle, and cleanup behavior into testable modules.
 - Inject platform operations, event writing, and termination waiting.
+- Separate CoreAudio policy from direct Apple API calls through `CoreAudioCalls`.
+- Cover process/device filtering, fallback, deduplication, aggregate policy, error mapping,
+  callback gating, and malformed buffer handling.
 - Add Swift unit and failure-path tests.
 - Enforce 100% line, function, branch, and executable-region coverage for the declared
   project-owned Swift logic scope.
@@ -87,26 +90,28 @@ coverage and mutation gate.
 
 ## Failure modes
 
-| Failure                              | Expected behavior                              | Test ID                    |
-| ------------------------------------ | ---------------------------------------------- | -------------------------- |
-| Tap creation fails                   | Typed error; no cleanup of unknown resources   | UT-SWIFT-PARTIAL-START-001 |
-| Aggregate or IO creation fails       | Reverse cleanup of acquired resources          | UT-SWIFT-PARTIAL-START-002 |
-| Unsupported tap format               | Typed error and tap cleanup                    | UT-SWIFT-FORMAT-001        |
-| Writer backlog exceeds limit         | Payload rejected; accounting remains bounded   | UT-SWIFT-BOUNDS-001        |
-| Event encoding fails                 | Error exit path and deterministic cleanup      | UT-SWIFT-PROTOCOL-001      |
-| Weak assertion permits a code mutant | Swift mutation gate fails and names the mutant | CI-SWIFT-MUTATION-001      |
+| Failure                              | Expected behavior                              | Test ID                     |
+| ------------------------------------ | ---------------------------------------------- | --------------------------- |
+| Tap creation fails                   | Typed error; no cleanup of unknown resources   | UT-SWIFT-PARTIAL-START-001  |
+| Aggregate or IO creation fails       | Reverse cleanup of acquired resources          | UT-SWIFT-PARTIAL-START-002  |
+| Unsupported tap format               | Typed error and tap cleanup                    | UT-SWIFT-FORMAT-001         |
+| Writer backlog exceeds limit         | Payload rejected; accounting remains bounded   | UT-SWIFT-BOUNDS-001         |
+| Event encoding fails                 | Error exit path and deterministic cleanup      | UT-SWIFT-PROTOCOL-001       |
+| CoreAudio discovery call fails       | Stable typed OSStatus contract                 | CT-SWIFT-COREAUDIO-PORT-001 |
+| Callback is late, null, or malformed | No post-destroy or malformed payload delivery  | UT-SWIFT-COREAUDIO-IO-001   |
+| Weak assertion permits a code mutant | Swift mutation gate fails and names the mutant | CI-SWIFT-MUTATION-001       |
 
 ## Test plan
 
-| Level       | Test IDs                                                        | Purpose                           |
-| ----------- | --------------------------------------------------------------- | --------------------------------- |
-| Unit        | UT-SWIFT-FORMAT-001, UT-SWIFT-BOUNDS-001, UT-SWIFT-PROTOCOL-001 | Pure helper policy                |
-| Property    | PT-SWIFT-BOUNDS-001                                             | Bounded accounting sequences      |
-| Mutation    | CI-SWIFT-MUTATION-001                                           | Assertion strength                |
-| Contract    | CT-SWIFT-COREAUDIO-PORT-001                                     | Injected platform operation order |
-| Integration | CI-SWIFT-COVERAGE-001, IT-PACKAGE-AUDIO-USAGE-001               | Coverage and package contract     |
-| E2E         | E2E-NATIVE-AUDIO-001                                            | Packaged helper lifecycle         |
-| Real device | RT-MAC-MEET-SYSTEM-SIGNAL-001                                   | CoreAudio/TCC behavior            |
+| Level       | Test IDs                                                                                   | Purpose                           |
+| ----------- | ------------------------------------------------------------------------------------------ | --------------------------------- |
+| Unit        | UT-SWIFT-FORMAT-001, UT-SWIFT-BOUNDS-001, UT-SWIFT-PROTOCOL-001, UT-SWIFT-COREAUDIO-IO-001 | Pure helper and callback policy   |
+| Property    | PT-SWIFT-BOUNDS-001                                                                        | Bounded accounting sequences      |
+| Mutation    | CI-SWIFT-MUTATION-001                                                                      | Assertion strength                |
+| Contract    | CT-SWIFT-COREAUDIO-PORT-001                                                                | Injected platform operation order |
+| Integration | CI-SWIFT-COVERAGE-001, IT-PACKAGE-AUDIO-USAGE-001                                          | Coverage and package contract     |
+| E2E         | E2E-NATIVE-AUDIO-001                                                                       | Packaged helper lifecycle         |
+| Real device | RT-MAC-MEET-SYSTEM-SIGNAL-001                                                              | CoreAudio/TCC behavior            |
 
 ## Security and privacy
 
@@ -118,8 +123,8 @@ coverage and mutation gate.
 ## Rollout
 
 - Land the test architecture in the existing draft PR.
-- Keep `TEST-NATIVE-AUDIO-001` open until GitHub-hosted Swift gates pass and the owner explicitly
-  accepts or rejects the documented CoreAudio binding/bootstrap structural-coverage boundary.
+- Keep `TEST-NATIVE-AUDIO-001` in progress until the changed GitHub-hosted Swift gates and package
+  job pass. The platform-boundary classification is accepted and fail-closed in the coverage tool.
 
 ## Rollback
 
@@ -131,12 +136,14 @@ coverage and mutation gate.
 - CI: [Pull request quality run 30353488390](https://github.com/konstantin-fokhtberger/cue/actions/runs/30353488390)
   passed `quality`, the native Swift structural/mutation step, packaging, and packaged E2E.
 - Coverage: `CueAudioTapCore` reports 246/246 lines, 32/32 functions, 33/33 instantiations, and
-  86/86 executable regions. Swift/LLVM reports zero branch records.
-- Mutation: 38/38 deterministic lifecycle, format, buffer, metrics, protocol, and cleanup mutants
-  compiled and were killed; 0 survived; 0 unviable; score 100%.
+  86/86 executable regions. `CoreAudioTapPlatform` reports 152/152 lines, 23/23 functions, 23/23
+  instantiations, and 58/58 executable regions. Swift/LLVM reports zero branch records.
+- Mutation: 65/65 deterministic core and CoreAudio policy mutants compiled and were killed;
+  0 survived; 0 unviable; score 100%.
 - Performance: no production-path benchmark change expected.
-- Real device: post-refactor CoreAudio probe captured 573,440 PCM bytes, 143,360 samples, 72,979
-  nonzero samples, peak 0.1767, and exited cleanly after SIGTERM.
+- Real device: post-facade CoreAudio probe captured 483,328 PCM bytes, 120,832 samples, 72,979
+  nonzero samples, peak 0.1757, emitted `started` then `stopped`, and exited with code 0 after
+  SIGTERM.
 - Package: ad-hoc `com.cue.overlay` package passed strict signing verification and packaged E2E
   7/7, including 100 Start/Stop cycles.
 
@@ -145,7 +152,7 @@ coverage and mutation gate.
 - Structural tests cannot prove CoreAudio/TCC behavior on future macOS builds.
 - The mutation manifest is intentionally explicit, so new critical logic requires new reviewed
   mutants.
-- SwiftPM test coverage does not link the executable `CoreAudioTapPlatform` and signal bootstrap
-  into the test binary. Their happy path is covered by the live CoreAudio probe and package tests,
-  but they do not have 100% structural failure-path coverage. Closing this as an explicit platform
-  exception requires owner approval; without that approval this backlog item remains blocked.
+- `LiveCoreAudioCalls.swift` and the executable composition/signal root are not structurally
+  instrumented. They are deliberately limited to direct CoreAudio/Darwin calls and raw pointer
+  marshalling; their behavior remains dependent on package and target-Mac evidence.
+- GitHub-hosted acceptance for the changed 65-mutant gate is still pending.

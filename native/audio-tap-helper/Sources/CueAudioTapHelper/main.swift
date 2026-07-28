@@ -1,4 +1,5 @@
 import CueAudioTapCore
+import CueAudioTapPlatform
 import Darwin
 import Foundation
 

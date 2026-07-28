@@ -41,6 +41,7 @@ describe('IT-PACKAGE-AUDIO-USAGE-001 macOS CoreAudio Tap package contract', () =
     expect(helperBuildSource).toContain("'swift', 'build'");
     expect(helperBuildSource).toContain("'cue-audio-tap-helper'");
     expect(swiftPackageSource).toContain('.library(name: "CueAudioTapCore"');
+    expect(swiftPackageSource).toContain('.library(name: "CueAudioTapPlatform"');
     expect(swiftPackageSource).toContain('.executable(name: "cue-audio-tap-helper"');
     expect(swiftPackageSource).toContain('"__info_plist"');
     expect(packageJson.scripts['test:swift']).toBe('node tools/test-swift-helper.mjs');

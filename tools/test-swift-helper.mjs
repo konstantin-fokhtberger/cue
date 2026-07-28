@@ -44,12 +44,34 @@ const { stdout: coveragePathOutput } = await execute(
 );
 const coveragePath = coveragePathOutput.trim();
 const coverage = JSON.parse(await readFile(coveragePath, 'utf8'));
-const productionFiles = coverage.data[0].files.filter((file) =>
-  file.filename.includes('/Sources/CueAudioTapCore/'),
+const requiredProductionFiles = [
+  path.join('Sources', 'CueAudioTapCore', 'HelperCore.swift'),
+  path.join('Sources', 'CueAudioTapPlatform', 'CoreAudioTapPlatform.swift'),
+];
+const productionFiles = requiredProductionFiles.map((relativePath) => {
+  const file = coverage.data[0].files.find((candidate) =>
+    candidate.filename.endsWith(relativePath),
+  );
+  if (!file) {
+    throw new Error(`Swift coverage contains no required production file: ${relativePath}`);
+  }
+  return file;
+});
+const unexpectedPolicyFiles = coverage.data[0].files.filter(
+  (file) =>
+    (file.filename.includes('/Sources/CueAudioTapCore/') ||
+      file.filename.includes('/Sources/CueAudioTapPlatform/')) &&
+    !requiredProductionFiles.some((relativePath) => file.filename.endsWith(relativePath)) &&
+    !file.filename.endsWith(
+      path.join('Sources', 'CueAudioTapPlatform', 'LiveCoreAudioCalls.swift'),
+    ),
 );
-
-if (productionFiles.length === 0) {
-  throw new Error('Swift coverage contains no CueAudioTapCore production files.');
+if (unexpectedPolicyFiles.length > 0) {
+  throw new Error(
+    `Swift coverage scope must classify new production files explicitly:\n${unexpectedPolicyFiles
+      .map((file) => file.filename)
+      .join('\n')}`,
+  );
 }
 
 const failures = [];

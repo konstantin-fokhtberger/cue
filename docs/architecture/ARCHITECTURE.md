@@ -92,6 +92,9 @@ Use a signed Swift CoreAudio Process Tap helper behind `SystemAudioCapturePort`.
 CoreAudio Process Tap
         |
 signed Swift helper
+  CueAudioTapCore: lifecycle/protocol/bounds
+  CueAudioTapPlatform: tested CoreAudio policy
+  LiveCoreAudioCalls: direct Apple API boundary
   stdout: Float32LE mono PCM
   stderr: validated JSON lifecycle events
         |
@@ -105,6 +108,13 @@ AudioPipeline(system channel)
 
 Microphone capture remains a separate Electron media path. Meeting Start does not enumerate
 screen sources, and ScreenCaptureKit is not an automatic fallback.
+
+The helper uses an injected `CoreAudioCalls` facade. Device discovery, fallback, deduplication,
+aggregate-device policy, OSStatus error contracts, callback gating, and payload validation are
+project policy and remain inside the structurally tested `CoreAudioTapPlatform`. Direct CoreAudio
+property calls, C callback/pointer marshalling, and the executable signal/composition root form the
+explicit live platform boundary. That boundary contains no provider, capture-scope, fallback, or
+retention policy and requires Swift build, package, signing, E2E, and target-Mac evidence.
 
 Production system-audio capture follows the accepted `ADR-007` scope policy:
 
