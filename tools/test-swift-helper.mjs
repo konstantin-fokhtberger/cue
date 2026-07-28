@@ -45,6 +45,7 @@ const { stdout: coveragePathOutput } = await execute(
 const coveragePath = coveragePathOutput.trim();
 const coverage = JSON.parse(await readFile(coveragePath, 'utf8'));
 const requiredProductionFiles = [
+  path.join('Sources', 'CueAudioTapCore', 'CaptureScopeResolver.swift'),
   path.join('Sources', 'CueAudioTapCore', 'HelperCore.swift'),
   path.join('Sources', 'CueAudioTapCore', 'HelperControl.swift'),
   path.join('Sources', 'CueAudioTapPlatform', 'CoreAudioTapPlatform.swift'),

@@ -12,6 +12,7 @@ const projectRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '
 const packageDirectory = path.join(projectRoot, 'native', 'audio-tap-helper');
 const coreRelativePath = path.join('Sources', 'CueAudioTapCore', 'HelperCore.swift');
 const controlRelativePath = path.join('Sources', 'CueAudioTapCore', 'HelperControl.swift');
+const resolverRelativePath = path.join('Sources', 'CueAudioTapCore', 'CaptureScopeResolver.swift');
 const platformRelativePath = path.join(
   'Sources',
   'CueAudioTapPlatform',
@@ -258,6 +259,88 @@ const controlMutations = [
     to: 'guard !chunk.isEmpty else {',
   },
 ];
+const resolverMutations = [
+  {
+    id: 'resolver-process-index',
+    from: 'processByPID[process.pid] = process',
+    to: 'processByPID.removeValue(forKey: process.pid)',
+  },
+  {
+    id: 'resolver-object-id-grouping',
+    from: 'accumulator.objectIDs.insert(observation.objectID)',
+    to: 'accumulator.objectIDs.remove(observation.objectID)',
+  },
+  {
+    id: 'resolver-device-grouping',
+    from: 'accumulator.deviceUIDs.formUnion(normalizedDeviceUIDs(observation.deviceUIDs))',
+    to: '_ = observation.deviceUIDs',
+  },
+  {
+    id: 'resolver-source-order',
+    from: '$0.audioProcessObjectIDs[0] < $1.audioProcessObjectIDs[0]',
+    to: '$0.audioProcessObjectIDs[0] > $1.audioProcessObjectIDs[0]',
+  },
+  {
+    id: 'resolver-generation-required',
+    from: 'guard selection.inventoryGeneration == inventory.generation else {',
+    to: 'guard true else {',
+  },
+  {
+    id: 'resolver-instance-pid-required',
+    from: 'source.identity?.pid == selection.responsiblePID',
+    to: 'true',
+  },
+  {
+    id: 'resolver-bundle-required',
+    from: 'source.identity?.bundleIdentifier == selection.bundleIdentifier',
+    to: 'true',
+  },
+  {
+    id: 'resolver-browser-acknowledgement-required',
+    from: 'guard !source.requiresBrowserWideAcknowledgement || selection.browserWideAcknowledged else {',
+    to: 'guard true else {',
+  },
+  {
+    id: 'resolver-output-device-required',
+    from: 'guard !source.outputDeviceUIDs.isEmpty else {',
+    to: 'guard true else {',
+  },
+  {
+    id: 'resolver-cycle-rejected',
+    from: 'guard visited.insert(currentPID).inserted else {',
+    to: 'guard true else {',
+  },
+  {
+    id: 'resolver-cue-ancestry-rejected',
+    from: 'guard !process.isCueOwned else {',
+    to: 'guard true else {',
+  },
+  {
+    id: 'resolver-regular-app-required',
+    from: 'if process.isRegularApplication {',
+    to: 'if true {',
+  },
+  {
+    id: 'resolver-parent-traversal',
+    from: 'currentPID = parentPID',
+    to: 'currentPID = process.pid',
+  },
+  {
+    id: 'resolver-trims-identity',
+    from: 'let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)',
+    to: 'let trimmed = value',
+  },
+  {
+    id: 'resolver-rejects-empty-identity',
+    from: 'return trimmed.isEmpty ? nil : trimmed',
+    to: 'return trimmed',
+  },
+  {
+    id: 'resolver-chrome-prefix-disclosure',
+    from: '|| bundleIdentifier.hasPrefix("com.google.Chrome.")',
+    to: '|| false',
+  },
+];
 const platformMutations = [
   {
     id: 'platform-process-unknown-filter',
@@ -401,6 +484,10 @@ const mutations = [
     ...mutation,
     relativePath: controlRelativePath,
   })),
+  ...resolverMutations.map((mutation) => ({
+    ...mutation,
+    relativePath: resolverRelativePath,
+  })),
   ...platformMutations.map((mutation) => ({
     ...mutation,
     relativePath: platformRelativePath,
@@ -441,10 +528,12 @@ if (!(await runSwift(packageDirectory, ['test']))) {
 
 const sourceByRelativePath = new Map(
   await Promise.all(
-    [coreRelativePath, controlRelativePath, platformRelativePath].map(async (relativePath) => [
-      relativePath,
-      await readFile(path.join(packageDirectory, relativePath), 'utf8'),
-    ]),
+    [coreRelativePath, controlRelativePath, resolverRelativePath, platformRelativePath].map(
+      async (relativePath) => [
+        relativePath,
+        await readFile(path.join(packageDirectory, relativePath), 'utf8'),
+      ],
+    ),
   ),
 );
 const rootTemporaryDirectory = await mkdtemp(path.join(os.tmpdir(), 'cue-swift-mutation-'));

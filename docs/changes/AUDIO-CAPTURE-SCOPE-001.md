@@ -130,19 +130,34 @@ closed.
 - Disable system-audio provider dispatch and retain explicit degraded state. Never fall back to
   diagnostic-global capture.
 
+## Implemented vertical slice
+
+- Pure Swift resolver model accepts only a current inventory generation and exact responsible
+  PID plus bundle ID.
+- Audio helper processes are grouped through bounded ancestry under one regular responsible
+  application while simultaneous same-bundle application instances remain separate.
+- cue-owned ancestry, cycles, missing process metadata, excessive ancestry depth, and missing
+  responsible identity produce explicit non-selectable states.
+- Device UIDs are normalized and deduplicated; a selected source without an associated output
+  device fails closed.
+- Chrome and Chrome variants require explicit browser-wide acknowledgement.
+- Live CoreAudio process inventory, renderer selection UI, application-scope control protocol,
+  and inclusion-tap wiring remain outside this slice.
+
 ## Verification evidence
 
 - CI: pending.
-- Coverage: local JS focused tests and Swift 100% structural gate passed for the implemented
-  diagnostic-global boundary and helper control protocol.
-- Mutation: local Swift gate killed 74/74 mutants; full JS mutation gate reached 100% with 1,136
-  killed, 4 timed out, and 0 survived.
+- Coverage: `CaptureScopeResolver.swift` passed the Swift structural gate with 26/26 functions,
+  27/27 instantiations, 187/187 lines, and 61/61 regions.
+- Mutation: all 16 resolver-specific mutants were killed; the complete local Swift gate killed
+  90/90 viable mutants with 0 survived and 0 unviable.
 - Performance: pending.
 - Real device: pending.
 - Package: implemented diagnostic-global boundary passed ad-hoc arm64 packaging and packaged E2E
-  8/8; application-scope package evidence remains pending.
+  9/9; application-scope package evidence remains pending.
 - Provider boundary: `CT-NO-GLOBAL-STT-001` policy rejects absent, inherited, diagnostic-global,
-  and unverified scopes; application resolver evidence remains pending.
+  and unverified scopes. The pure application resolver is verified; live inventory and
+  application-scope IPC integration remain pending.
 
 ## Residual risks and follow-up
 
