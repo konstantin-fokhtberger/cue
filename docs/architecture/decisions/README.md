@@ -8,5 +8,6 @@
 | [ADR-004](ADR-004-javascript-quality-toolchain.md) | Accepted | Use Vitest, V8, Stryker, fast-check, Playwright, ESLint, Prettier, and checkJs |
 | [ADR-005](ADR-005-audio-device-selection.md)       | Accepted | Select cue input/output independently and expose requested/effective devices   |
 | [ADR-006](ADR-006-native-coreaudio-tap-helper.md)  | Accepted | Use a signed Swift CoreAudio Process Tap helper behind SystemAudioCapturePort  |
+| [ADR-007](ADR-007-meeting-audio-capture-scope.md)  | Proposed | Select an explicit meeting application scope instead of the global system mix  |
 
 New material architecture decisions require an ADR before implementation.
