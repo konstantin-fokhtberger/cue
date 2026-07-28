@@ -6,7 +6,7 @@
 | --------------- | -------------------------------------------- |
 | Backlog ID      | BUG-AUDIO-002                                |
 | Requirement IDs | FR-AUDIO-002, 004; NFR-OBS-001, NFR-COMP-001 |
-| Status          | in progress                                  |
+| Status          | done                                         |
 | Owner           | project maintainer                           |
 | Target revision | `spike/SPIKE-AUDIO-001-electron-capture`     |
 
@@ -33,34 +33,32 @@ channel не может маскировать неработающий system c
 
 ## Assumptions
 
-- После удаления stale TCC record и повторного добавления текущего signed bundle CoreAudio
-  Tap сможет открыть system stream без legacy feature flag.
-- `NSAudioCaptureUsageDescription` в package уже достаточен для Electron 43; это должно быть
-  подтверждено package policy test и реальным запуском.
-- Если новый CoreAudio Tap flow остается неработоспособным после исправления TCC, legacy
-  ScreenCaptureKit permission flow допустим только как явно зафиксированный fallback spike.
+- Future macOS/CoreAudio releases may change process-tap behavior and require a new target-Mac
+  acceptance run.
+- Silently restoring an Electron screen-capture path is not an acceptable fallback.
 
 ## Scope
 
-- Зафиксировать macOS display-media и package policy как project-owned production logic.
-- Проверять platform-specific display-media grant до передачи callback в Electron.
+- Заменить неработающий Electron display-media meeting path узким нативным CoreAudio Tap helper.
+- Перечислять активные output-device routes вместо предположения о системном default output.
 - Классифицировать и показывать system-channel failure без ложного общего active состояния.
-- Предотвратить вторую Start-попытку в рамках одного неуспешного UI transition.
-- Добавить regression tests для TCC/code-requirement mismatch и platform policy.
+- Обеспечить generation-safe Start/Stop и завершение helper после Stop.
+- Добавить protocol, lifecycle, packaging, no-screen-path и failure regression tests.
 - Повторить Google Meet с HyperX input и Sony Bluetooth output на целевом Mac.
 
 ## Non-goals
 
-- Zoom и Teams certification.
+- Zoom и Teams certification. A two-participant Zoom signal smoke is evidence, not full
+  certification.
 - Автоматическое изменение или сброс TCC database.
 - Скрытый cross-platform fallback.
-- Swift helper до завершения Electron/CoreAudio Tap spike.
 - STT и транскрипция.
 
 ## Architecture and affected boundaries
 
-- Components: main-process display-media policy, renderer capture status, package metadata.
-- Trust boundaries: Electron display-media request, macOS TCC, CoreAudio Tap, MediaStream.
+- Components: main-process native-helper adapter, Swift CoreAudio Tap helper, renderer capture
+  status, package metadata.
+- Trust boundaries: Electron IPC, helper protocol, macOS TCC, CoreAudio Tap.
 - State transitions: session starting -> microphone active + system active/degraded -> stopped.
 - Data and retention: только локальные sanitized errors и счетчики; PCM не сохраняется.
 
@@ -75,14 +73,14 @@ channel не может маскировать неработающий system c
 
 ## Acceptance criteria
 
-1. macOS policy не использует Windows-only assumptions без явного platform branch.
+1. Meeting path не использует Electron display-media или screen-source enumeration.
 2. Package содержит `NSAudioCaptureUsageDescription` и стабильную team-backed identity.
 3. Stale/denied TCC не оставляет system channel в ложном active состоянии.
 4. Одна пользовательская Start-операция публикует одну system failure.
 5. Microphone и system health наблюдаются независимо.
 6. При исправленных разрешениях Google Meet создает ненулевые system PCM frames.
-7. Stop завершает оба канала и после Stop счетчики PCM не растут.
-8. Legacy feature flag не включается без отдельного evidence-backed решения.
+7. Stop завершает оба канала и helper; после Stop счетчики PCM не растут.
+8. Active meeting-app output routes захватываются независимо от macOS default output.
 
 ## Failure modes
 
@@ -126,7 +124,8 @@ channel не может маскировать неработающий system c
 
 ## Verification evidence
 
-- CI: local quality workflow passed; GitHub Actions remains pending until push.
+- CI: [Pull request quality run 30331220452](https://github.com/konstantin-fokhtberger/cue/actions/runs/30331220452)
+  passed both `quality` and `package-macos-arm64`.
 - Coverage: 100% statements, branches, functions, and lines across 173 tests.
 - Mutation: 100% score with 0 surviving mutants.
 - Performance: pending.
@@ -134,6 +133,9 @@ channel не может маскировать неработающий system c
   aggregate tap from currently active output devices instead of a fixed default route.
 - Google Meet acceptance: one Mac participant and one phone participant produced 2,292 PCM chunks,
   391,168 samples, 247,441 nonzero samples, and peak 29,521 through the signed package.
+- Zoom signal smoke: one Mac participant and one phone participant produced 4,816 PCM chunks,
+  827,562 samples, 225,162 nonzero samples, and peak 11,294. The helper was absent after Stop.
+  Because Codex launched this run, it is not independent TCC-identity evidence.
 - Stop acceptance: state and metrics remained unchanged for five seconds after Stop and the native
   helper process exited.
 - TCC recovery: stale `cue` records were removed and the current signed bundle was re-added
@@ -148,3 +150,5 @@ channel не может маскировать неработающий system c
 
 - TCC cannot be fully automated on GitHub-hosted CI.
 - A self-hosted target-Mac lane remains required for release-grade permission regression.
+- Teams is waived only for the current manual spike because no test conference is available. It
+  remains unverified and blocks any claim of full Zoom/Teams/Meet certification.

@@ -154,6 +154,10 @@ or introduces a native Swift helper.
   12-секундное окно. System RMS/peak составили `4595`/`32767`, microphone RMS/peak -
   `71`/`676`, корреляция bucket RMS - `-0.478`. Оба context закрылись, post-Stop message delta
   составили `[0, 0]`.
+- Zoom: встреча с одним участником на Mac и одним на телефоне дала 4,816 system PCM chunks,
+  827,562 samples, 225,162 nonzero samples и peak 11,294. После Stop нативный helper завершился.
+  Этот запуск был инициирован из Codex и поэтому не используется как независимое доказательство
+  TCC identity.
 - Package: Electron 43.2.0 and electron-builder 26.15.3 produce an arm64 app containing the
   expected bundle identifier and audio-capture usage description.
 
@@ -167,6 +171,8 @@ or introduces a native Swift helper.
 - Mixed system audio does not itself identify 1-8 remote speakers.
 - Built-in output, route switching, sleep/wake, and meeting-app behavior for every accepted
   route remain separate matrix dimensions.
+- Microsoft Teams manual acceptance is waived for this spike by the product owner because a test
+  conference is unavailable. Teams remains unverified and is not removed from the release matrix.
 - Four moderate dependency advisories remain; two are in the production dependency graph.
 - Runtime instrumentation found and verified the fix for `BUG-AUDIO-001`: duplicate
   concurrent system-capture requests are coalesced by a generation-aware resource slot, and

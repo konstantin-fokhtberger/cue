@@ -6,7 +6,7 @@
 | --------------- | ---------------------------------------- |
 | Backlog ID      | BUG-AUDIO-003                            |
 | Requirement IDs | FR-AUDIO-002, FR-CODE-001, FR-PRIV-006   |
-| Status          | in progress                              |
+| Status          | done                                     |
 | Owner           | project maintainer                       |
 | Target revision | `spike/SPIKE-AUDIO-001-electron-capture` |
 
@@ -121,7 +121,8 @@ feature.
 
 ## Verification evidence
 
-- CI: local quality workflow passed; GitHub Actions remains pending until push.
+- CI: [Pull request quality run 30331220452](https://github.com/konstantin-fokhtberger/cue/actions/runs/30331220452)
+  passed both `quality` and `package-macos-arm64`.
 - Coverage: 100% statements, branches, functions, and lines across 173 tests.
 - Mutation: 100% score, 1,029 killed and 4 timed-out mutants, 0 survivors.
 - Performance: 2,292 PCM chunks during the accepted Meet interval; formal latency gate pending.

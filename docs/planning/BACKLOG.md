@@ -21,61 +21,77 @@
 
 ## Ordered backlog
 
-| ID                | Epic     | Priority | Status      | Deliverable                                                          | Dependencies                              |
-| ----------------- | -------- | -------: | ----------- | -------------------------------------------------------------------- | ----------------------------------------- |
-| DOC-001           | EPIC-001 |       P0 | done        | Engineering documentation baseline                                   | None                                      |
-| DEC-001           | EPIC-001 |       P0 | done        | Accept languages and code-switching requirements                     | DOC-001                                   |
-| DEC-002           | EPIC-001 |       P0 | done        | Accept participant-count target                                      | DOC-001                                   |
-| DEC-003           | EPIC-001 |       P0 | done        | Accept latency SLOs                                                  | DOC-001                                   |
-| DEC-004           | EPIC-006 |       P0 | done        | Accept retention and recording policy                                | DOC-001                                   |
-| DEC-005           | EPIC-006 |       P0 | done        | Select default STT and LLM providers                                 | DOC-001                                   |
-| TOOL-001          | EPIC-001 |       P0 | done        | Select test, coverage, mutation, lint, and type-check toolchain      | DOC-001                                   |
-| CI-001            | EPIC-001 |       P0 | done        | Add pull-request CI with reproducible dependency installation        | TOOL-001                                  |
-| CI-002            | EPIC-001 |       P0 | proposed    | Add self-hosted target-Mac test lane                                 | CI-001                                    |
-| SPIKE-AUDIO-001   | EPIC-002 |       P0 | active      | Modern Electron/CoreAudio Tap feasibility spike                      | TOOL-001                                  |
-| BUG-AUDIO-001     | EPIC-002 |       P0 | done        | Prevent duplicate concurrent system-audio start                      | SPIKE-AUDIO-001                           |
-| BUG-AUDIO-002     | EPIC-002 |       P0 | in_progress | Restore and expose macOS CoreAudio Tap system capture                | SPIKE-AUDIO-001, TEST-AUDIO-001           |
-| BUG-AUDIO-003     | EPIC-006 |       P0 | in_progress | Remove implicit ScreenCapture permission from Meeting mode           | BUG-AUDIO-002                             |
-| ADR-DEVICE-001    | EPIC-002 |       P0 | done        | Accept cue input/output selection and fallback policy                | SPIKE-AUDIO-001                           |
-| AUDIO-DEVICE-001  | EPIC-002 |       P0 | active      | Explicit cue input/output selectors and effective-device diagnostics | ADR-DEVICE-001, TEST-AUDIO-001            |
-| AUDIO-DIAG-001    | EPIC-002 |       P0 | done        | Local provider-free microphone/output diagnostics                    | AUDIO-DEVICE-001, TEST-AUDIO-001          |
-| BUG-PKG-001       | EPIC-006 |       P0 | done        | Стабилизировать identity `com.cue.overlay` в тестовых macOS-пакетах  | SPIKE-AUDIO-001                           |
-| TEST-AUDIO-001    | EPIC-002 |       P0 | done        | Capture adapter contract suite and deterministic audio fixtures      | TOOL-001                                  |
-| TEST-AUDIO-002    | EPIC-002 |       P0 | proposed    | Zoom/Teams/Meet x accepted audio-route automation matrix             | SPIKE-AUDIO-001, AUDIO-DEVICE-001, CI-002 |
-| ADR-AUDIO-001     | EPIC-002 |       P0 | proposed    | Accept Electron adapter or Swift helper based on spike               | SPIKE-AUDIO-001, TEST-AUDIO-002           |
-| ARCH-SESSION-001  | EPIC-003 |       P0 | proposed    | Pure session state machine with generation cancellation              | TOOL-001                                  |
-| ARCH-TIMELINE-001 | EPIC-003 |       P0 | proposed    | Session-scoped transcript event model                                | ARCH-SESSION-001                          |
-| ARCH-PROVIDER-001 | EPIC-006 |       P0 | proposed    | Provider policy with fallback disabled by default                    | TOOL-001                                  |
-| SEC-KEYCHAIN-001  | EPIC-006 |       P0 | proposed    | Move provider credentials to macOS Keychain                          | TOOL-001                                  |
-| SEC-IPC-001       | EPIC-006 |       P0 | proposed    | Typed, bounded, sender-validated IPC contracts                       | TOOL-001                                  |
-| STT-001           | EPIC-004 |       P0 | proposed    | Realtime transcription adapter behind a stable port                  | DEC-005, ARCH-PROVIDER-001                |
-| STT-002           | EPIC-004 |       P0 | proposed    | Remote speaker diarization and reconciliation                        | DEC-001, DEC-002, STT-001                 |
-| MEET-001          | EPIC-005 |       P1 | proposed    | Meeting session UI and status model                                  | ARCH-SESSION-001                          |
-| MEET-002          | EPIC-005 |       P1 | proposed    | On-demand reply suggestion                                           | ARCH-TIMELINE-001, STT-001                |
-| MEET-003          | EPIC-005 |       P1 | proposed    | Follow-up questions                                                  | MEET-002                                  |
-| MEET-004          | EPIC-005 |       P1 | proposed    | Recap, decisions, and action items                                   | STT-002                                   |
-| MEET-005          | EPIC-005 |       P1 | proposed    | Speaker label rename and correction UI                               | STT-002                                   |
-| UI-WINDOW-001     | EPIC-009 |       P1 | ready       | Add a safe upper drag region for moving the overlay across displays  | None                                      |
-| UI-MENUBAR-001    | EPIC-009 |       P1 | ready       | Add a menu bar status item with graceful `Close app` action          | None                                      |
-| PKG-001           | EPIC-006 |       P1 | proposed    | Signed, hardened, notarized daily-use package                        | ADR-AUDIO-001                             |
-| REL-001           | EPIC-001 |       P1 | proposed    | Long-session, fault-injection, and performance release gate          | Meeting MVP                               |
-| INT-001           | EPIC-007 |       P1 | proposed    | Interview profile and isolated professional context                  | Meeting MVP                               |
-| CODE-001          | EPIC-008 |       P2 | proposed    | Explicit screen/coding profile                                       | Meeting MVP                               |
+| ID                | Epic     | Priority | Status   | Deliverable                                                          | Dependencies                              |
+| ----------------- | -------- | -------: | -------- | -------------------------------------------------------------------- | ----------------------------------------- |
+| DOC-001           | EPIC-001 |       P0 | done     | Engineering documentation baseline                                   | None                                      |
+| DEC-001           | EPIC-001 |       P0 | done     | Accept languages and code-switching requirements                     | DOC-001                                   |
+| DEC-002           | EPIC-001 |       P0 | done     | Accept participant-count target                                      | DOC-001                                   |
+| DEC-003           | EPIC-001 |       P0 | done     | Accept latency SLOs                                                  | DOC-001                                   |
+| DEC-004           | EPIC-006 |       P0 | done     | Accept retention and recording policy                                | DOC-001                                   |
+| DEC-005           | EPIC-006 |       P0 | done     | Select default STT and LLM providers                                 | DOC-001                                   |
+| TOOL-001          | EPIC-001 |       P0 | done     | Select test, coverage, mutation, lint, and type-check toolchain      | DOC-001                                   |
+| CI-001            | EPIC-001 |       P0 | done     | Add pull-request CI with reproducible dependency installation        | TOOL-001                                  |
+| CI-002            | EPIC-001 |       P0 | proposed | Add self-hosted target-Mac test lane                                 | CI-001                                    |
+| SPIKE-AUDIO-001   | EPIC-002 |       P0 | active   | Modern Electron/CoreAudio Tap feasibility spike                      | TOOL-001                                  |
+| BUG-AUDIO-001     | EPIC-002 |       P0 | done     | Prevent duplicate concurrent system-audio start                      | SPIKE-AUDIO-001                           |
+| BUG-AUDIO-002     | EPIC-002 |       P0 | done     | Restore and expose macOS CoreAudio Tap system capture                | SPIKE-AUDIO-001, TEST-AUDIO-001           |
+| BUG-AUDIO-003     | EPIC-006 |       P0 | done     | Remove implicit ScreenCapture permission from Meeting mode           | BUG-AUDIO-002                             |
+| ADR-DEVICE-001    | EPIC-002 |       P0 | done     | Accept cue input/output selection and fallback policy                | SPIKE-AUDIO-001                           |
+| AUDIO-DEVICE-001  | EPIC-002 |       P0 | active   | Explicit cue input/output selectors and effective-device diagnostics | ADR-DEVICE-001, TEST-AUDIO-001            |
+| AUDIO-DIAG-001    | EPIC-002 |       P0 | done     | Local provider-free microphone/output diagnostics                    | AUDIO-DEVICE-001, TEST-AUDIO-001          |
+| BUG-PKG-001       | EPIC-006 |       P0 | done     | Стабилизировать identity `com.cue.overlay` в тестовых macOS-пакетах  | SPIKE-AUDIO-001                           |
+| TEST-AUDIO-001    | EPIC-002 |       P0 | done     | Capture adapter contract suite and deterministic audio fixtures      | TOOL-001                                  |
+| TEST-AUDIO-002    | EPIC-002 |       P0 | proposed | Zoom/Teams/Meet x accepted audio-route automation matrix             | SPIKE-AUDIO-001, AUDIO-DEVICE-001, CI-002 |
+| ADR-AUDIO-001     | EPIC-002 |       P0 | proposed | Accept Electron adapter or Swift helper based on spike               | SPIKE-AUDIO-001, TEST-AUDIO-002           |
+| ARCH-SESSION-001  | EPIC-003 |       P0 | proposed | Pure session state machine with generation cancellation              | TOOL-001                                  |
+| ARCH-TIMELINE-001 | EPIC-003 |       P0 | proposed | Session-scoped transcript event model                                | ARCH-SESSION-001                          |
+| ARCH-PROVIDER-001 | EPIC-006 |       P0 | proposed | Provider policy with fallback disabled by default                    | TOOL-001                                  |
+| SEC-KEYCHAIN-001  | EPIC-006 |       P0 | proposed | Move provider credentials to macOS Keychain                          | TOOL-001                                  |
+| SEC-IPC-001       | EPIC-006 |       P0 | proposed | Typed, bounded, sender-validated IPC contracts                       | TOOL-001                                  |
+| STT-001           | EPIC-004 |       P0 | proposed | Realtime transcription adapter behind a stable port                  | DEC-005, ARCH-PROVIDER-001                |
+| STT-002           | EPIC-004 |       P0 | proposed | Remote speaker diarization and reconciliation                        | DEC-001, DEC-002, STT-001                 |
+| MEET-001          | EPIC-005 |       P1 | proposed | Meeting session UI and status model                                  | ARCH-SESSION-001                          |
+| MEET-002          | EPIC-005 |       P1 | proposed | On-demand reply suggestion                                           | ARCH-TIMELINE-001, STT-001                |
+| MEET-003          | EPIC-005 |       P1 | proposed | Follow-up questions                                                  | MEET-002                                  |
+| MEET-004          | EPIC-005 |       P1 | proposed | Recap, decisions, and action items                                   | STT-002                                   |
+| MEET-005          | EPIC-005 |       P1 | proposed | Speaker label rename and correction UI                               | STT-002                                   |
+| UI-WINDOW-001     | EPIC-009 |       P1 | ready    | Add a safe upper drag region for moving the overlay across displays  | None                                      |
+| UI-MENUBAR-001    | EPIC-009 |       P1 | ready    | Add a menu bar status item with graceful `Close app` action          | None                                      |
+| PKG-001           | EPIC-006 |       P1 | proposed | Signed, hardened, notarized daily-use package                        | ADR-AUDIO-001                             |
+| REL-001           | EPIC-001 |       P1 | proposed | Long-session, fault-injection, and performance release gate          | Meeting MVP                               |
+| INT-001           | EPIC-007 |       P1 | proposed | Interview profile and isolated professional context                  | Meeting MVP                               |
+| CODE-001          | EPIC-008 |       P2 | proposed | Explicit screen/coding profile                                       | Meeting MVP                               |
 
 ## Next executable package
 
 The next implementation package should contain:
 
-1. `SPIKE-AUDIO-001` - complete Electron PCM and TCC feasibility evidence.
-2. `BUG-AUDIO-001` - add a tested single-flight system-capture start guard.
-3. `TEST-AUDIO-001` - capture adapter contract and deterministic fixture foundation.
-4. `BUG-PKG-001` - стабилизировать identity target-Mac пакета между тестовыми сборками.
-5. `AUDIO-DEVICE-001` - отделить cue microphone selection от macOS default и фиксировать
-   effective device.
-6. `AUDIO-DIAG-001` - отделить локальную проверку capture/output от наличия облачного
-   transcription key.
+1. `ADR-AUDIO-001` - formally accept the native CoreAudio Tap helper based on Meet and Zoom
+   evidence and record the Electron-only path as rejected for production meeting capture.
+2. `AUDIO-DEVICE-001` - complete live route-switch, disconnect/reconnect, and sleep/wake
+   acceptance.
+3. `TEST-AUDIO-002` - automate the feasible provider x route matrix and preserve Teams as
+   unverified until a conference is available.
+4. `UI-WINDOW-001` - add the accepted drag region after the capture architecture decision.
+5. `UI-MENUBAR-001` - add graceful menu bar shutdown with capture cleanup evidence.
 
-Feature work must not begin before the audio feasibility and session-testability gates.
+STT and meeting-assistance feature work must not begin before `ADR-AUDIO-001` is accepted and the
+remaining target-Mac lifecycle risks have explicit disposition.
+
+## Current meeting-application evidence
+
+- Google Meet passed signed-package system-audio signal, Stop lifecycle, and no-screen-prompt
+  acceptance with one participant on the Mac and one participant on a phone.
+- Zoom passed the current two-participant system-audio and Stop smoke on the target Mac:
+  4,816 chunks, 827,562 samples, 225,162 nonzero samples, peak 11,294, and no helper process
+  after Stop.
+- The Zoom run was launched from Codex, so its TCC attribution is not accepted as an independent
+  standalone identity test. The earlier signed-package Google Meet run remains the TCC evidence.
+- Microsoft Teams is waived only for the current manual spike because the product owner cannot
+  create a test conference. It remains an unverified release requirement and is not recorded as
+  passed.
+- The full provider x route matrix, route switching, disconnect/reconnect, and sleep/wake remain
+  in `TEST-AUDIO-002`.
 
 ## Application shell acceptance notes
 
