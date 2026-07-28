@@ -270,6 +270,7 @@ function audioFixtureScript({ captureMode, microphoneMode, workletFailures }) {
 
 function systemAudioHelperFixtureScript() {
   return `#!/usr/bin/env node
+import { execFileSync } from 'node:child_process';
 import { appendFileSync } from 'node:fs';
 
 const logPath = process.env.CUE_E2E_AUDIO_HELPER_LOG;
@@ -277,11 +278,13 @@ const mode = process.env.CUE_E2E_AUDIO_HELPER_MODE || 'healthy';
 const frame = Buffer.alloc(48 * 4);
 for (let index = 0; index < 48; index += 1) frame.writeFloatLE(index % 2 ? 0.25 : -0.25, index * 4);
 let timer;
+let parentMonitor;
 let started = false;
 const stop = () => {
   if (!started) process.exit(0);
   started = false;
   clearInterval(timer);
+  clearInterval(parentMonitor);
   appendFileSync(logPath, 'stop\\n');
   process.exit(0);
 };
@@ -297,15 +300,27 @@ process.stdin.on('data', (chunk) => {
   const expected = '{"command":"capture","protocolVersion":1,"scope":{"kind":"diagnostic-global"}}';
   if (control.slice(0, newline) !== expected) process.exit(2);
   started = true;
-  appendFileSync(logPath, 'start\\n');
+  appendFileSync(logPath, \`start:\${process.ppid}:\${process.pid}\\n\`);
   if (mode === 'initialization-failed') {
     process.stderr.write('{"event":"error","message":"fixture failure"}\\n');
     process.exit(1);
   }
   process.stderr.write('{"channels":1,"event":"started","format":"float32le","sampleRate":48000,"scope":{"kind":"diagnostic-global","verified":false}}\\n');
   timer = setInterval(() => process.stdout.write(frame), 5);
+  const ownerPID = process.ppid;
+  parentMonitor = setInterval(() => {
+    try {
+      const actualParentPID = Number(
+        execFileSync('/bin/ps', ['-o', 'ppid=', '-p', String(process.pid)], { encoding: 'utf8' }).trim(),
+      );
+      if (actualParentPID !== ownerPID) stop();
+    } catch {
+      stop();
+    }
+  }, 25);
 });
 process.stdin.on('end', stop);
+process.stdin.on('close', stop);
 process.stdin.resume();
 `;
 }
@@ -371,6 +386,14 @@ async function launchCue(microphoneMode, fixtureOptions = {}) {
     temporaryRoot,
     async helperEvents() {
       const content = await readFile(helperLogPath, 'utf8');
+      return content
+        .trim()
+        .split('\n')
+        .filter(Boolean)
+        .map((event) => event.split(':', 1)[0]);
+    },
+    async helperRawEvents() {
+      const content = await readFile(helperLogPath, 'utf8');
       return content.trim().split('\n').filter(Boolean);
     },
     async close() {
@@ -386,14 +409,32 @@ async function launchCue(microphoneMode, fixtureOptions = {}) {
   };
 }
 
-async function waitForHelperEventCount(fixture, expectedCount) {
-  const deadline = Date.now() + 2_000;
-  while ((await fixture.helperEvents()).length !== expectedCount) {
+async function waitForHelperEventCount(fixture, expectedCount, timeoutMs = 2_000) {
+  const deadline = Date.now() + timeoutMs;
+  let observedEvents = await fixture.helperEvents();
+  while (observedEvents.length !== expectedCount) {
     if (Date.now() >= deadline) {
-      throw new Error(`Timed out waiting for ${expectedCount} native-helper lifecycle events.`);
+      throw new Error(
+        `Timed out waiting for ${expectedCount} native-helper lifecycle events; observed ${JSON.stringify(observedEvents)}.`,
+      );
+    }
+    await new Promise((resolve) => setTimeout(resolve, 10));
+    observedEvents = await fixture.helperEvents();
+  }
+}
+
+async function waitForProcessExit(processID, timeoutMs = 5_000) {
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
+    try {
+      process.kill(processID, 0);
+    } catch (error) {
+      if (error.code === 'ESRCH') return;
+      throw error;
     }
     await new Promise((resolve) => setTimeout(resolve, 10));
   }
+  throw new Error(`Timed out waiting for native helper process ${processID} to exit.`);
 }
 
 test('E2E-AUDIO-DIAG-001 uses exact local routes without provider traffic', async () => {
@@ -494,7 +535,7 @@ test(
 );
 
 test(
-  'E2E-HELPER-PARENT-DEATH-001 closes helper control stdin after abrupt Electron exit',
+  'E2E-HELPER-PARENT-DEATH-001 exits the helper after abrupt Electron exit',
   { timeout: 10_000 },
   async () => {
     const fixture = await launchCue('healthy');
@@ -504,11 +545,22 @@ test(
       await fixture.page.locator('#stop-btn').click();
       await waitForHelperEventCount(fixture, 1);
 
-      assert.equal(fixture.electronApp.process().kill('SIGKILL'), true);
+      const electronProcess = fixture.electronApp.process();
+      const [event, helperParentPID, helperProcessID] = (await fixture.helperRawEvents())[0].split(
+        ':',
+      );
+      assert.equal(event, 'start');
+      assert.equal(Number(helperParentPID), electronProcess.pid);
+      const electronExit = new Promise((resolve) => electronProcess.once('exit', resolve));
+      assert.equal(electronProcess.kill('SIGKILL'), true);
       parentKilled = true;
-      await waitForHelperEventCount(fixture, 2);
+      await electronExit;
+      await waitForProcessExit(Number(helperProcessID));
 
-      assert.deepEqual(await fixture.helperEvents(), ['start', 'stop']);
+      assert.deepEqual(
+        (await fixture.helperEvents()).filter((helperEvent) => helperEvent !== 'stop'),
+        ['start'],
+      );
       assert.deepEqual(fixture.networkRequests, []);
     } finally {
       if (parentKilled) {

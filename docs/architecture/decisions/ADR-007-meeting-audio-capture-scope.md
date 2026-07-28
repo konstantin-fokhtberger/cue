@@ -112,14 +112,15 @@ The Swift helper should own CoreAudio process resolution.
    - ambiguity status.
 2. Electron presents normalized applications, not raw helper processes.
 3. Start sends one bounded, versioned JSON configuration over stdin.
-4. The helper keeps stdin open as the parent-liveness channel required by `BUG-AUDIO-004`.
+4. The helper keeps stdin open for graceful EOF cleanup and independently checks PPID in bounded
+   intervals so inherited Chromium pipe writers cannot mask parent death.
 5. The helper resolves the selected application into an inclusion set and creates
    `CATapDescription(monoMixdownOfProcesses:)`.
 6. Empty bundle IDs, multiple matching instances, process restart, and disappearing sources are
    explicit states. None enables global fallback.
 
-Using one stdin protocol for configuration and parent liveness reduces process-supervision
-complexity compared with introducing a second IPC channel.
+Using stdin plus a local PPID guard keeps process supervision bounded without introducing a
+second IPC or heartbeat channel.
 
 ## Acceptance criteria
 
@@ -148,7 +149,8 @@ complexity compared with introducing a second IPC channel.
 - Reuses the accepted CoreAudio helper for Zoom, Teams, and browser applications.
 - Explicit source identity improves diagnostics and prevents false meeting labels.
 - Inclusion mode excludes cue playback by construction when cue is not selected.
-- The stdin configuration channel also solves parent-death supervision.
+- The stdin configuration channel provides graceful cleanup, with PPID supervision as an
+  independent orphan backstop.
 
 ### Negative
 

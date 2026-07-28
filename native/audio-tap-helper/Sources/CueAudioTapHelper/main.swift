@@ -3,25 +3,28 @@ import CueAudioTapPlatform
 import Darwin
 import Foundation
 
-private final class SignalControlBridge {
-  private let terminateSource: DispatchSourceSignal
-  private let interruptSource: DispatchSourceSignal
+private let ownerPID = getppid()
 
-  init() {
-    signal(SIGTERM, SIG_IGN)
-    signal(SIGINT, SIG_IGN)
-    terminateSource = DispatchSource.makeSignalSource(signal: SIGTERM)
-    interruptSource = DispatchSource.makeSignalSource(signal: SIGINT)
-    terminateSource.setEventHandler { Darwin.close(STDIN_FILENO) }
-    interruptSource.setEventHandler { Darwin.close(STDIN_FILENO) }
-    terminateSource.resume()
-    interruptSource.resume()
+private func readControlChunk() -> Data {
+  while ownerPID > 1 && getppid() == ownerPID {
+    var descriptor = pollfd(
+      fd: STDIN_FILENO,
+      events: Int16(POLLIN | POLLHUP),
+      revents: 0
+    )
+    let result = Darwin.poll(&descriptor, 1, 100)
+    if result > 0 {
+      return FileHandle.standardInput.availableData
+    }
+    if result < 0 && errno != EINTR {
+      return Data()
+    }
   }
+  return Data()
 }
 
-private let signalBridge = SignalControlBridge()
 private let control = StreamHelperControl(
-  readChunk: { FileHandle.standardInput.availableData }
+  readChunk: readControlChunk
 )
 private let writerQueue = DispatchQueue(label: "com.cue.audio-tap-helper.stdout")
 private let writer = BoundedSignalWriter(
@@ -40,6 +43,4 @@ private let runner = HelperRunner(
   writeEvent: { FileHandle.standardError.write($0) }
 )
 
-withExtendedLifetime(signalBridge) {
-  exit(runner.run())
-}
+exit(runner.run())
