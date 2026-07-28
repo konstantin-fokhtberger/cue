@@ -103,15 +103,15 @@ closed.
 
 ## Test plan
 
-| Level       | Test IDs                                                                                     | Purpose                       |
-| ----------- | -------------------------------------------------------------------------------------------- | ----------------------------- |
-| Unit        | UT-SCOPE-RESOLVER-001, UT-SCOPE-EMPTY-IDENTITY-001                                           | normalization and fail-closed |
-| Property    | PT-SCOPE-PROCESS-GRAPH-001                                                                   | ancestry graph combinations   |
-| Mutation    | MT-SCOPE-POLICY-001, MT-SCOPE-INVENTORY-001                                                  | policy assertion strength     |
-| Contract    | CT-CAPTURE-SCOPE-001, CT-SCOPE-INSTANCE-001, CT-SCOPE-LIVE-INVENTORY-001, CT-SCOPE-STALE-001 | IPC, resolver, live inventory |
-| Integration | CT-NO-GLOBAL-STT-001                                                                         | provider boundary             |
-| E2E         | E2E-CAPTURE-SCOPE-001, E2E-BROWSER-SCOPE-DISCLOSURE-001                                      | selection and disclosure UI   |
-| Real device | RT-MAC-APP-SCOPE-001, RT-MAC-SELF-AUDIO-001                                                  | isolation and self-exclusion  |
+| Level       | Test IDs                                                                                                                                        | Purpose                                       |
+| ----------- | ----------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------- |
+| Unit        | UT-SCOPE-RESOLVER-001, UT-SCOPE-EMPTY-IDENTITY-001                                                                                              | normalization and fail-closed                 |
+| Property    | PT-SCOPE-PROCESS-GRAPH-001                                                                                                                      | ancestry graph combinations                   |
+| Mutation    | MT-SCOPE-POLICY-001, MT-SCOPE-INVENTORY-001                                                                                                     | policy assertion strength                     |
+| Contract    | CT-CAPTURE-SCOPE-001, CT-SCOPE-INSTANCE-001, CT-SCOPE-LIVE-INVENTORY-001, CT-SCOPE-STALE-001, CT-SCOPE-EFFECTIVE-001, CT-SCOPE-INVALIDATION-001 | IPC, resolver, inclusion tap, effective scope |
+| Integration | CT-NO-GLOBAL-STT-001                                                                                                                            | provider boundary                             |
+| E2E         | E2E-CAPTURE-SCOPE-001, E2E-BROWSER-SCOPE-DISCLOSURE-001                                                                                         | selection and disclosure UI                   |
+| Real device | RT-MAC-APP-SCOPE-001, RT-MAC-SELF-AUDIO-001                                                                                                     | isolation and self-exclusion                  |
 
 ## Security and privacy
 
@@ -160,8 +160,23 @@ closed.
 - The settings UI keeps same-bundle instances separate, discloses the exact Chrome browser-wide
   boundary, and requires acknowledgement before accepting that selection.
 - Requested application scope remains explicitly `verified: false`. Inclusion-tap wiring,
-  effective-scope lifecycle, provider dispatch, and target-Mac isolation remain outside this
-  slice and continue to fail closed.
+  effective-scope lifecycle, and provider dispatch are now wired end to end.
+- Each capture helper independently rebuilds the live inventory for the requested generation and
+  resolves the exact responsible PID plus bundle ID before creating a tap.
+- Production application capture uses `CATapDescription(monoMixdownOfProcesses:)` with only the
+  verified CoreAudio process object IDs. It does not use the global tap or its default-device
+  fallback.
+- The application aggregate includes only output device UIDs associated with the verified
+  process set.
+- On macOS 26, CoreAudio process restoration is disabled. While capture is active, the helper
+  periodically repeats live resolution and stops if the effective process set or route no longer
+  matches.
+- The helper emits a sanitized `verified: true` effective scope. Electron rejects missing,
+  unverified, extended, or mismatched metadata before accepting PCM for provider dispatch.
+- The renderer presents requested and effective scope separately. Capture cannot start without a
+  current main-process-owned selection.
+- Target-Mac Chrome and Zoom isolation evidence remains pending, so the change stays
+  `in_progress`.
 
 ## Verification evidence
 
@@ -169,29 +184,42 @@ closed.
   passed `quality` in 3m08s and `package-macos-arm64` in 10m35s, including the expanded Swift
   structural and mutation gates, arm64 package verification, and packaged E2E.
 - Coverage: `CaptureScopeResolver.swift` passed the Swift structural gate with 26/26 functions,
-  27/27 instantiations, 187/187 lines, and 61/61 regions. The expanded
-  `CoreAudioTapPlatform.swift` passed with 34/34 functions, 34/34 instantiations, 284/284 lines,
-  and 102/102 regions. The final local JS gate passed 740/740 statements, 407/407 branches,
-  142/142 functions, and 720/720 lines across 261 tests.
+  27/27 instantiations, 189/189 lines, and 61/61 regions. The expanded
+  `CoreAudioTapPlatform.swift` passed with 36/36 functions, 36/36 instantiations, 299/299 lines,
+  and 108/108 regions. `HelperCore.swift` passed 44/44 functions, 46/46 instantiations, 382/382
+  lines, and 141/141 regions. The current local JS gate passed 763/763 statements, 441/441
+  branches, 147/147 functions, and 743/743 lines across 290 tests.
 - Mutation: all 16 resolver-specific and all 12 live-inventory-specific mutants were killed. The
   helper inventory protocol, event mapping, generation forwarding, and no-capture-lifecycle
   assertions passed the expanded local Swift mutation gate at 114/114 killed, 0 survived, and 0
   unviable. The final local JS gate scored 100% with 1,503 killed, 4 timed out, 0 survived, and 0
   without coverage across 1,507 tested mutants.
+- Current mutation: the expanded Swift gate killed 134/134 viable mutants, including requested
+  and effective scope, exact inclusion IDs, selected devices, revalidation, application control
+  decoding, and fresh-generation platform forwarding. The final JS gate killed 1,644 mutants with
+  4 accepted timeouts, 0 survivors, and 0 uncovered mutants.
 - Performance: pending.
 - Real device: pending.
-- Package: the selector/IPC slice passed local arm64 ad-hoc packaging, strict signing-policy
-  inspection, source E2E 10/10, and packaged E2E 10/10. The ad-hoc CI-style package correctly
+- Package: the current slice passed local arm64 ad-hoc packaging, strict signing-policy
+  inspection, source E2E 11/11, and packaged E2E 11/11. The ad-hoc CI-style package correctly
   reports `tccStable: false`; stable local TCC identity is not claimed by this evidence.
 - Live helper protocol: the production helper accepted generation 1, emitted exactly one
   `inventory` event with an empty source list, wrote zero stdout bytes, and exited zero. No active
   audio source was present, so live source metadata acceptance is not inferred from this check.
-- Provider boundary: `CT-NO-GLOBAL-STT-001` policy rejects absent, inherited, diagnostic-global,
-  and unverified scopes. The pure resolver, injected live inventory composition, helper inventory
-  protocol, bounded Electron client, and application-scope IPC/UI are implemented; live CoreAudio
-  metadata acceptance, inclusion tap, and provider integration remain pending.
+- Provider boundary: `CT-NO-GLOBAL-STT-001` rejects absent, inherited, diagnostic-global,
+  unverified, extended, and requested/effective-mismatched scopes. Source E2E passes 11/11 with a
+  verified application helper fixture, including mandatory selection before microphone/helper
+  start, visible effective scope, 100 leak-free Start/Stop cycles, and zero provider network traffic
+  without configured credentials.
+- Native inclusion contract: Swift unit and adapter tests cover exact application command
+  decoding, fresh live resolution, nonempty inclusion IDs, selected-device-only aggregate input,
+  sanitized effective metadata, and fail-closed scope revalidation.
+- CI and packaged evidence for this slice are pending the next pushed workflow run.
 
 ## Residual risks and follow-up
 
 - Chromium process ancestry may change across releases and requires target-Mac regression.
+- Live CoreAudio inclusion behavior and unrelated-audio rejection have not yet been accepted on the
+  target Mac. Structural, fixture, and package checks are necessary but do not substitute for that
+  evidence.
 - Teams remains unverified until a conference is available.
