@@ -128,7 +128,8 @@ coverage and mutation gate.
 
 ## Verification evidence
 
-- CI: pending.
+- CI: [Pull request quality run 30353488390](https://github.com/konstantin-fokhtberger/cue/actions/runs/30353488390)
+  passed `quality`, the native Swift structural/mutation step, packaging, and packaged E2E.
 - Coverage: `CueAudioTapCore` reports 246/246 lines, 32/32 functions, 33/33 instantiations, and
   86/86 executable regions. Swift/LLVM reports zero branch records.
 - Mutation: 38/38 deterministic lifecycle, format, buffer, metrics, protocol, and cleanup mutants
