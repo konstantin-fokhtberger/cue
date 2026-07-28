@@ -218,10 +218,12 @@ closed.
 - Native inclusion contract: Swift unit and adapter tests cover exact application command
   decoding, fresh live resolution, nonempty inclusion IDs, selected-device-only aggregate input,
   sanitized effective metadata, and fail-closed scope revalidation.
-- CI and packaged evidence for this slice are pending the next pushed workflow run.
-- Regression for run 30380790580: the package job must compile the helper with the runner's older
-  SDK without directly referencing the macOS 26-only Swift property
-  `CATapDescription.isProcessRestoreEnabled`.
+- CI regression: run 30380790580 failed because the runner's older SDK could not compile a direct
+  reference to the macOS 26-only Swift property
+  `CATapDescription.isProcessRestoreEnabled`. Follow-up
+  [run 30383114629](https://github.com/konstantin-fokhtberger/cue/actions/runs/30383114629)
+  passed `quality` in 3m16s and `package-macos-arm64` in 14m12s, including native Swift
+  structural/mutation gates, ad-hoc package verification, and packaged Electron E2E.
 
 ## Residual risks and follow-up
 
