@@ -152,8 +152,9 @@ closed.
 
 ## Verification evidence
 
-- CI: resolver slice passed [Pull request quality run 30364461891](https://github.com/konstantin-fokhtberger/cue/actions/runs/30364461891);
-  the changed live-inventory slice is pending.
+- CI: [Pull request quality run 30368267606](https://github.com/konstantin-fokhtberger/cue/actions/runs/30368267606)
+  passed `quality` in 2m22s and `package-macos-arm64` in 8m46s, including Swift structural and
+  mutation gates, arm64 package verification, and packaged E2E.
 - Coverage: `CaptureScopeResolver.swift` passed the Swift structural gate with 26/26 functions,
   27/27 instantiations, 187/187 lines, and 61/61 regions. The expanded
   `CoreAudioTapPlatform.swift` passed with 34/34 functions, 34/34 instantiations, 284/284 lines,
@@ -162,8 +163,8 @@ closed.
   complete local Swift gate killed 102/102 viable mutants with 0 survived and 0 unviable.
 - Performance: pending.
 - Real device: pending.
-- Package: the changed live-inventory slice passed local arm64 ad-hoc packaging, strict signing
-  inspection, and packaged E2E 9/9; changed CI package evidence is pending.
+- Package: the changed live-inventory slice passed local and CI arm64 ad-hoc packaging, strict
+  signing inspection, and packaged E2E 9/9.
 - Provider boundary: `CT-NO-GLOBAL-STT-001` policy rejects absent, inherited, diagnostic-global,
   and unverified scopes. The pure resolver and injected live inventory composition are verified;
   live CoreAudio metadata acceptance and application-scope IPC integration remain pending.
