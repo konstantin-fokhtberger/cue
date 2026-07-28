@@ -51,6 +51,24 @@ final class LiveCoreAudioCalls: CoreAudioCalls {
     return readObjectIDs(AudioObjectID(kAudioObjectSystemObject), &address)
   }
 
+  func processPID(processID: UInt32) -> CoreAudioResult<Int32> {
+    var address = propertyAddress(kAudioProcessPropertyPID)
+    var pid: pid_t = 0
+    var size = UInt32(MemoryLayout<pid_t>.stride)
+    let status = AudioObjectGetPropertyData(processID, &address, 0, nil, &size, &pid)
+    return result(status, value: pid)
+  }
+
+  func processBundleID(processID: UInt32) -> CoreAudioResult<String> {
+    var address = propertyAddress(kAudioProcessPropertyBundleID)
+    var size = UInt32(MemoryLayout<CFString>.stride)
+    var bundleIdentifier: CFString = "" as CFString
+    let status = withUnsafeMutablePointer(to: &bundleIdentifier) { pointer in
+      AudioObjectGetPropertyData(processID, &address, 0, nil, &size, pointer)
+    }
+    return result(status, value: bundleIdentifier as String)
+  }
+
   func isRunningOutput(processID: UInt32) -> CoreAudioResult<UInt32> {
     var address = propertyAddress(kAudioProcessPropertyIsRunningOutput)
     var running: UInt32 = 0

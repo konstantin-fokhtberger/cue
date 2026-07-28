@@ -153,6 +153,8 @@ coverage and mutation gate.
 - Structural tests cannot prove CoreAudio/TCC behavior on future macOS builds.
 - The mutation manifest is intentionally explicit, so new critical logic requires new reviewed
   mutants.
-- `LiveCoreAudioCalls.swift` and the executable composition/signal root are not structurally
-  instrumented. They are deliberately limited to direct CoreAudio/Darwin calls and raw pointer
-  marshalling; their behavior remains dependent on package and target-Mac evidence.
+- `LiveCoreAudioCalls.swift`, `LiveProcessMetadataCalls.swift`, and the executable
+  composition/signal root are not structurally instrumented. They are deliberately limited to
+  direct CoreAudio, AppKit, libproc, and Darwin calls plus raw pointer marshalling. Application
+  classification and fail-closed policy remain in the instrumented modules; live boundary
+  behavior remains dependent on package and target-Mac evidence.

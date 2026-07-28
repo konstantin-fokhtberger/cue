@@ -103,15 +103,15 @@ closed.
 
 ## Test plan
 
-| Level       | Test IDs                                                        | Purpose                       |
-| ----------- | --------------------------------------------------------------- | ----------------------------- |
-| Unit        | UT-SCOPE-RESOLVER-001, UT-SCOPE-EMPTY-IDENTITY-001              | normalization and fail-closed |
-| Property    | PT-SCOPE-PROCESS-GRAPH-001                                      | ancestry graph combinations   |
-| Mutation    | MT-SCOPE-POLICY-001                                             | policy assertion strength     |
-| Contract    | CT-CAPTURE-SCOPE-001, CT-SCOPE-INSTANCE-001, CT-SCOPE-STALE-001 | IPC and resolver contract     |
-| Integration | CT-NO-GLOBAL-STT-001                                            | provider boundary             |
-| E2E         | E2E-CAPTURE-SCOPE-001, E2E-BROWSER-SCOPE-DISCLOSURE-001         | selection and disclosure UI   |
-| Real device | RT-MAC-APP-SCOPE-001, RT-MAC-SELF-AUDIO-001                     | isolation and self-exclusion  |
+| Level       | Test IDs                                                                                     | Purpose                       |
+| ----------- | -------------------------------------------------------------------------------------------- | ----------------------------- |
+| Unit        | UT-SCOPE-RESOLVER-001, UT-SCOPE-EMPTY-IDENTITY-001                                           | normalization and fail-closed |
+| Property    | PT-SCOPE-PROCESS-GRAPH-001                                                                   | ancestry graph combinations   |
+| Mutation    | MT-SCOPE-POLICY-001, MT-SCOPE-INVENTORY-001                                                  | policy assertion strength     |
+| Contract    | CT-CAPTURE-SCOPE-001, CT-SCOPE-INSTANCE-001, CT-SCOPE-LIVE-INVENTORY-001, CT-SCOPE-STALE-001 | IPC, resolver, live inventory |
+| Integration | CT-NO-GLOBAL-STT-001                                                                         | provider boundary             |
+| E2E         | E2E-CAPTURE-SCOPE-001, E2E-BROWSER-SCOPE-DISCLOSURE-001                                      | selection and disclosure UI   |
+| Real device | RT-MAC-APP-SCOPE-001, RT-MAC-SELF-AUDIO-001                                                  | isolation and self-exclusion  |
 
 ## Security and privacy
 
@@ -141,23 +141,32 @@ closed.
 - Device UIDs are normalized and deduplicated; a selected source without an associated output
   device fails closed.
 - Chrome and Chrome variants require explicit browser-wide acknowledgement.
-- Live CoreAudio process inventory, renderer selection UI, application-scope control protocol,
-  and inclusion-tap wiring remain outside this slice.
+- The platform adapter composes active CoreAudio process objects, PIDs, bundle IDs, and output
+  device UIDs with bounded AppKit/libproc ancestry into the pure resolver.
+- Missing or invalid CoreAudio process identity is skipped fail-closed; missing process metadata,
+  responsible identity, or cue-owned ancestry remains explicitly non-selectable.
+- Direct CoreAudio, AppKit, and libproc calls are isolated behind injected ports; cue-owned and
+  application classification remains in the structurally covered platform policy.
+- Renderer selection UI, application-scope control protocol, and inclusion-tap wiring remain
+  outside this slice.
 
 ## Verification evidence
 
-- CI: pending.
+- CI: resolver slice passed [Pull request quality run 30364461891](https://github.com/konstantin-fokhtberger/cue/actions/runs/30364461891);
+  the changed live-inventory slice is pending.
 - Coverage: `CaptureScopeResolver.swift` passed the Swift structural gate with 26/26 functions,
-  27/27 instantiations, 187/187 lines, and 61/61 regions.
-- Mutation: all 16 resolver-specific mutants were killed; the complete local Swift gate killed
-  90/90 viable mutants with 0 survived and 0 unviable.
+  27/27 instantiations, 187/187 lines, and 61/61 regions. The expanded
+  `CoreAudioTapPlatform.swift` passed with 34/34 functions, 34/34 instantiations, 284/284 lines,
+  and 102/102 regions.
+- Mutation: all 16 resolver-specific and all 12 live-inventory-specific mutants were killed; the
+  complete local Swift gate killed 102/102 viable mutants with 0 survived and 0 unviable.
 - Performance: pending.
 - Real device: pending.
-- Package: implemented diagnostic-global boundary passed ad-hoc arm64 packaging and packaged E2E
-  9/9; application-scope package evidence remains pending.
+- Package: the changed live-inventory slice passed local arm64 ad-hoc packaging, strict signing
+  inspection, and packaged E2E 9/9; changed CI package evidence is pending.
 - Provider boundary: `CT-NO-GLOBAL-STT-001` policy rejects absent, inherited, diagnostic-global,
-  and unverified scopes. The pure application resolver is verified; live inventory and
-  application-scope IPC integration remain pending.
+  and unverified scopes. The pure resolver and injected live inventory composition are verified;
+  live CoreAudio metadata acceptance and application-scope IPC integration remain pending.
 
 ## Residual risks and follow-up
 

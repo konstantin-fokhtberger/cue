@@ -25,6 +25,8 @@ protocol CoreAudioCalls: AnyObject {
   func tapUID(for tapID: UInt32) -> CoreAudioResult<String>
   func tapFormat(for tapID: UInt32) -> CoreAudioResult<TapFormat>
   func processIDs() -> CoreAudioResult<[UInt32]>
+  func processPID(processID: UInt32) -> CoreAudioResult<Int32>
+  func processBundleID(processID: UInt32) -> CoreAudioResult<String>
   func isRunningOutput(processID: UInt32) -> CoreAudioResult<UInt32>
   func outputDeviceIDs(processID: UInt32) -> CoreAudioResult<[UInt32]>
   func defaultOutputDeviceID() -> CoreAudioResult<UInt32>
@@ -41,18 +43,51 @@ protocol CoreAudioCalls: AnyObject {
   func destroyTap(_ tapID: UInt32)
 }
 
+protocol ProcessMetadataCalls: AnyObject {
+  func processNode(pid: Int32) -> ProcessNode?
+}
+
 public final class CoreAudioTapPlatform: AudioTapPlatform {
   private let calls: CoreAudioCalls
+  private let processMetadata: ProcessMetadataCalls
+  private let resolver: CaptureScopeResolver
+  private let maximumProcessAncestryDepth: Int
   private let identifier: String
   private let callbackLock = NSLock()
   private var ioCallbackActive = false
 
   public convenience init() {
-    self.init(calls: LiveCoreAudioCalls(), identifier: UUID().uuidString)
+    let maximumProcessAncestryDepth = 16
+    self.init(
+      calls: LiveCoreAudioCalls(),
+      processMetadata: LiveProcessMetadataCalls(),
+      resolver: CaptureScopeResolver(maximumAncestryDepth: maximumProcessAncestryDepth),
+      maximumProcessAncestryDepth: maximumProcessAncestryDepth,
+      identifier: UUID().uuidString
+    )
   }
 
-  init(calls: CoreAudioCalls, identifier: String) {
+  convenience init(calls: CoreAudioCalls, identifier: String) {
+    self.init(
+      calls: calls,
+      processMetadata: LiveProcessMetadataCalls(),
+      resolver: CaptureScopeResolver(),
+      identifier: identifier
+    )
+  }
+
+  init(
+    calls: CoreAudioCalls,
+    processMetadata: ProcessMetadataCalls,
+    resolver: CaptureScopeResolver,
+    maximumProcessAncestryDepth: Int = 16,
+    identifier: String
+  ) {
+    precondition(maximumProcessAncestryDepth > 0)
     self.calls = calls
+    self.processMetadata = processMetadata
+    self.resolver = resolver
+    self.maximumProcessAncestryDepth = maximumProcessAncestryDepth
     self.identifier = identifier
   }
 
@@ -117,6 +152,65 @@ public final class CoreAudioTapPlatform: AudioTapPlatform {
       }
     }
     return deviceUIDs
+  }
+
+  public func applicationCaptureInventory(
+    generation: UInt64
+  ) throws -> ApplicationCaptureInventory {
+    let processIDs = try require(
+      calls.processIDs(),
+      operation: "AudioObjectGetPropertyData(process IDs)"
+    )
+    var observations = [AudioProcessObservation]()
+    var coreAudioBundleIDByPID = [Int32: String]()
+    var deviceUIDByID = [UInt32: String]()
+
+    for processID in processIDs where processID != 0 {
+      guard case .success(let running) = calls.isRunningOutput(processID: processID),
+        running != 0,
+        case .success(let pid) = calls.processPID(processID: processID),
+        pid > 0
+      else {
+        continue
+      }
+      let deviceIDs = try require(
+        calls.outputDeviceIDs(processID: processID),
+        operation: "AudioObjectGetPropertyData(output device IDs)"
+      )
+      var deviceUIDs = [String]()
+      for deviceID in deviceIDs where deviceID != 0 {
+        let uid: String
+        if let cached = deviceUIDByID[deviceID] {
+          uid = cached
+        } else {
+          uid = try require(
+            calls.deviceUID(deviceID: deviceID),
+            operation: "AudioObjectGetPropertyData(output UID)"
+          )
+          deviceUIDByID[deviceID] = uid
+        }
+        deviceUIDs.append(uid)
+      }
+      if case .success(let bundleIdentifier) = calls.processBundleID(processID: processID) {
+        coreAudioBundleIDByPID[pid] = bundleIdentifier
+      }
+      observations.append(
+        AudioProcessObservation(
+          objectID: processID,
+          pid: pid,
+          deviceUIDs: deviceUIDs
+        )
+      )
+    }
+
+    return resolver.inventory(
+      generation: generation,
+      audioProcesses: observations,
+      processes: processNodes(
+        for: observations,
+        coreAudioBundleIDByPID: coreAudioBundleIDByPID
+      )
+    )
   }
 
   public func createAggregate(tapUID: String, outputDeviceUIDs: [String]) throws -> UInt32 {
@@ -193,6 +287,68 @@ public final class CoreAudioTapPlatform: AudioTapPlatform {
     callbackLock.withLock {
       ioCallbackActive = active
     }
+  }
+
+  private func processNodes(
+    for observations: [AudioProcessObservation],
+    coreAudioBundleIDByPID: [Int32: String]
+  ) -> [ProcessNode] {
+    var nodes = [Int32: ProcessNode]()
+    for observation in observations {
+      var currentPID = observation.pid
+      for _ in 0..<maximumProcessAncestryDepth {
+        if nodes[currentPID] != nil {
+          break
+        }
+        guard let discovered = processMetadata.processNode(pid: currentPID) else {
+          break
+        }
+        let node = merged(
+          discovered,
+          coreAudioBundleIdentifier: currentPID == observation.pid
+            ? coreAudioBundleIDByPID[currentPID] : nil
+        )
+        nodes[currentPID] = node
+        if node.isCueOwned || node.isRegularApplication {
+          break
+        }
+        guard let parentPID = node.parentPID else {
+          break
+        }
+        currentPID = parentPID
+      }
+    }
+    return Array(nodes.values)
+  }
+
+  private func merged(
+    _ node: ProcessNode,
+    coreAudioBundleIdentifier: String?
+  ) -> ProcessNode {
+    let bundleIdentifier =
+      normalized(node.bundleIdentifier)
+      ?? normalized(coreAudioBundleIdentifier)
+    return ProcessNode(
+      pid: node.pid,
+      parentPID: node.parentPID,
+      bundleIdentifier: bundleIdentifier,
+      displayName: node.displayName,
+      isRegularApplication: node.isRegularApplication,
+      isCueOwned: node.isCueOwned || isCueBundle(bundleIdentifier)
+    )
+  }
+
+  private func normalized(_ value: String?) -> String? {
+    guard let value else {
+      return nil
+    }
+    let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
+    return trimmed.isEmpty ? nil : trimmed
+  }
+
+  private func isCueBundle(_ bundleIdentifier: String?) -> Bool {
+    bundleIdentifier == "com.cue.overlay"
+      || bundleIdentifier?.hasPrefix("com.cue.overlay.") == true
   }
 
   private func record(_ buffers: [Data?]?, onPayload: (AudioPayload) -> Void) {

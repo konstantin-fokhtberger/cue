@@ -17,6 +17,8 @@ private final class FakeCoreAudioCalls: CoreAudioCalls {
     )
   )
   var processIDsResult: CoreAudioResult<[UInt32]> = .success([])
+  var processPIDResults = [UInt32: CoreAudioResult<Int32>]()
+  var processBundleIDResults = [UInt32: CoreAudioResult<String>]()
   var runningResults = [UInt32: CoreAudioResult<UInt32>]()
   var deviceResults = [UInt32: CoreAudioResult<[UInt32]>]()
   var defaultDeviceResult: CoreAudioResult<UInt32> = .success(99)
@@ -46,6 +48,16 @@ private final class FakeCoreAudioCalls: CoreAudioCalls {
   func processIDs() -> CoreAudioResult<[UInt32]> {
     operations.append("processIDs")
     return processIDsResult
+  }
+
+  func processPID(processID: UInt32) -> CoreAudioResult<Int32> {
+    operations.append("processPID:\(processID)")
+    return processPIDResults[processID] ?? .failure(-1)
+  }
+
+  func processBundleID(processID: UInt32) -> CoreAudioResult<String> {
+    operations.append("processBundleID:\(processID)")
+    return processBundleIDResults[processID] ?? .success("")
   }
 
   func isRunningOutput(processID: UInt32) -> CoreAudioResult<UInt32> {
@@ -103,6 +115,16 @@ private final class FakeCoreAudioCalls: CoreAudioCalls {
 
   func destroyTap(_ tapID: UInt32) {
     operations.append("destroyTap:\(tapID)")
+  }
+}
+
+private final class FakeProcessMetadataCalls: ProcessMetadataCalls {
+  var nodes = [Int32: ProcessNode]()
+  var requestedPIDs = [Int32]()
+
+  func processNode(pid: Int32) -> ProcessNode? {
+    requestedPIDs.append(pid)
+    return nodes[pid]
   }
 }
 
@@ -246,6 +268,237 @@ final class CoreAudioTapPlatformTests: XCTestCase {
           return XCTFail("Expected HelperError.operation, received \($0)")
         }
         XCTAssertEqual(name, operation)
+      }
+    }
+  }
+
+  func testApplicationInventoryComposesRunningCoreAudioProcessesWithResponsibleApplications()
+    throws
+  {
+    let calls = FakeCoreAudioCalls()
+    calls.processIDsResult = .success([0, 101, 102, 201, 301, 401])
+    calls.runningResults = [
+      101: .success(1),
+      102: .success(1),
+      201: .success(2),
+      301: .failure(-30),
+      401: .success(0),
+    ]
+    calls.processPIDResults = [
+      101: .success(1_001),
+      102: .success(1_002),
+      201: .success(2_001),
+    ]
+    calls.processBundleIDResults = [
+      101: .success("com.google.Chrome.helper"),
+      102: .success("com.google.Chrome.helper"),
+      201: .success("com.google.Chrome.helper"),
+    ]
+    calls.deviceResults = [
+      101: .success([0, 31]),
+      102: .success([31, 32]),
+      201: .success([33]),
+    ]
+    calls.deviceUIDResults = [
+      31: .success("sony"),
+      32: .success(""),
+      33: .success("display"),
+    ]
+    let metadata = FakeProcessMetadataCalls()
+    metadata.nodes = [
+      1_001: ProcessNode(pid: 1_001, parentPID: 1_000),
+      1_002: ProcessNode(pid: 1_002, parentPID: 1_000),
+      1_000: ProcessNode(
+        pid: 1_000,
+        parentPID: 1,
+        bundleIdentifier: "com.google.Chrome",
+        displayName: "Google Chrome",
+        isRegularApplication: true
+      ),
+      2_001: ProcessNode(pid: 2_001, parentPID: 2_000),
+      2_000: ProcessNode(
+        pid: 2_000,
+        parentPID: 1,
+        bundleIdentifier: "com.google.Chrome",
+        displayName: "Google Chrome",
+        isRegularApplication: true
+      ),
+    ]
+    let platform = CoreAudioTapPlatform(
+      calls: calls,
+      processMetadata: metadata,
+      resolver: CaptureScopeResolver(maximumAncestryDepth: 8),
+      identifier: "fixed-id"
+    )
+
+    XCTAssertEqual(
+      try platform.applicationCaptureInventory(generation: 42),
+      ApplicationCaptureInventory(
+        generation: 42,
+        sources: [
+          ApplicationCaptureSource(
+            identity: ResponsibleApplicationIdentity(
+              pid: 1_000,
+              bundleIdentifier: "com.google.Chrome",
+              displayName: "Google Chrome"
+            ),
+            status: .available,
+            audioProcessObjectIDs: [101, 102],
+            outputDeviceUIDs: ["sony"],
+            requiresBrowserWideAcknowledgement: true
+          ),
+          ApplicationCaptureSource(
+            identity: ResponsibleApplicationIdentity(
+              pid: 2_000,
+              bundleIdentifier: "com.google.Chrome",
+              displayName: "Google Chrome"
+            ),
+            status: .available,
+            audioProcessObjectIDs: [201],
+            outputDeviceUIDs: ["display"],
+            requiresBrowserWideAcknowledgement: true
+          ),
+        ]
+      )
+    )
+    XCTAssertFalse(calls.operations.contains("isRunning:0"))
+    XCTAssertFalse(calls.operations.contains("processPID:301"))
+    XCTAssertFalse(calls.operations.contains("processPID:401"))
+    XCTAssertFalse(calls.operations.contains("deviceUID:0"))
+    XCTAssertEqual(calls.operations.filter { $0 == "deviceUID:31" }.count, 1)
+    XCTAssertEqual(metadata.requestedPIDs.sorted(), [1_000, 1_001, 1_002, 2_000, 2_001])
+  }
+
+  func testApplicationInventoryFailsClosedForMissingPIDAndUsesCoreAudioBundleFallback() throws {
+    let calls = FakeCoreAudioCalls()
+    calls.processIDsResult = .success([10, 20])
+    calls.runningResults = [10: .success(1), 20: .success(1)]
+    calls.processPIDResults = [10: .failure(-10), 20: .success(2_000)]
+    calls.processBundleIDResults = [20: .success("us.zoom.xos")]
+    calls.deviceResults = [20: .success([50])]
+    calls.deviceUIDResults = [50: .success("sony")]
+    let metadata = FakeProcessMetadataCalls()
+    metadata.nodes = [
+      2_000: ProcessNode(
+        pid: 2_000,
+        parentPID: 1,
+        displayName: "zoom.us",
+        isRegularApplication: true
+      )
+    ]
+    let platform = CoreAudioTapPlatform(
+      calls: calls,
+      processMetadata: metadata,
+      resolver: CaptureScopeResolver(),
+      identifier: "fixed-id"
+    )
+
+    XCTAssertEqual(
+      try platform.applicationCaptureInventory(generation: 7).sources,
+      [
+        ApplicationCaptureSource(
+          identity: ResponsibleApplicationIdentity(
+            pid: 2_000,
+            bundleIdentifier: "us.zoom.xos",
+            displayName: "zoom.us"
+          ),
+          status: .available,
+          audioProcessObjectIDs: [20],
+          outputDeviceUIDs: ["sony"],
+          requiresBrowserWideAcknowledgement: false
+        )
+      ]
+    )
+    XCTAssertFalse(calls.operations.contains("devices:10"))
+    XCTAssertFalse(calls.operations.contains("processBundleID:10"))
+  }
+
+  func testApplicationInventoryPreservesUnresolvedMetadataAndCueExclusion() throws {
+    let calls = FakeCoreAudioCalls()
+    calls.processIDsResult = .success([10, 20, 30])
+    calls.runningResults = [10: .success(1), 20: .success(1), 30: .success(1)]
+    calls.processPIDResults = [
+      10: .success(1_000),
+      20: .success(2_000),
+      30: .success(3_000),
+    ]
+    calls.processBundleIDResults = [
+      10: .success("unavailable.metadata"),
+      20: .success(" "),
+      30: .success("com.cue.overlay.audio"),
+    ]
+    calls.deviceResults = [
+      10: .success([]),
+      20: .success([]),
+      30: .success([]),
+    ]
+    let metadata = FakeProcessMetadataCalls()
+    metadata.nodes = [
+      2_000: ProcessNode(pid: 2_000, parentPID: nil),
+      3_000: ProcessNode(
+        pid: 3_000,
+        parentPID: 1,
+        bundleIdentifier: "com.cue.overlay.audio",
+        displayName: "cue"
+      ),
+    ]
+    let platform = CoreAudioTapPlatform(
+      calls: calls,
+      processMetadata: metadata,
+      resolver: CaptureScopeResolver(),
+      identifier: "fixed-id"
+    )
+
+    XCTAssertEqual(
+      try platform.applicationCaptureInventory(generation: 8).sources.map(\.status),
+      [
+        .unresolved(.missingProcessMetadata),
+        .unresolved(.missingResponsibleIdentity),
+        .unresolved(.cueOwnedAncestry),
+      ]
+    )
+  }
+
+  func testApplicationInventoryMapsRequiredCoreAudioFailuresWithoutPartialSelection() {
+    let cases: [(FakeCoreAudioCalls, String)] = [
+      {
+        let calls = FakeCoreAudioCalls()
+        calls.processIDsResult = .failure(-40)
+        return (calls, "AudioObjectGetPropertyData(process IDs)")
+      }(),
+      {
+        let calls = FakeCoreAudioCalls()
+        calls.processIDsResult = .success([10])
+        calls.runningResults = [10: .success(1)]
+        calls.processPIDResults = [10: .success(1_000)]
+        calls.processBundleIDResults = [10: .success("us.zoom.xos")]
+        calls.deviceResults = [10: .failure(-41)]
+        return (calls, "AudioObjectGetPropertyData(output device IDs)")
+      }(),
+      {
+        let calls = FakeCoreAudioCalls()
+        calls.processIDsResult = .success([10])
+        calls.runningResults = [10: .success(1)]
+        calls.processPIDResults = [10: .success(1_000)]
+        calls.processBundleIDResults = [10: .success("us.zoom.xos")]
+        calls.deviceResults = [10: .success([50])]
+        calls.deviceUIDResults = [50: .failure(-42)]
+        return (calls, "AudioObjectGetPropertyData(output UID)")
+      }(),
+    ]
+
+    for (calls, expectedOperation) in cases {
+      let platform = CoreAudioTapPlatform(
+        calls: calls,
+        processMetadata: FakeProcessMetadataCalls(),
+        resolver: CaptureScopeResolver(),
+        identifier: "fixed-id"
+      )
+      XCTAssertThrowsError(try platform.applicationCaptureInventory(generation: 1)) {
+        guard case .operation(let operation, _) = $0 as? HelperError else {
+          return XCTFail("Expected HelperError.operation, received \($0)")
+        }
+        XCTAssertEqual(operation, expectedOperation)
       }
     }
   }

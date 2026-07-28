@@ -75,16 +75,19 @@ gate.
 
 The mandatory Swift structural scope is exact and fail-closed:
 
+- `Sources/CueAudioTapCore/CaptureScopeResolver.swift`;
 - `Sources/CueAudioTapCore/HelperCore.swift`;
+- `Sources/CueAudioTapCore/HelperControl.swift`;
 - `Sources/CueAudioTapPlatform/CoreAudioTapPlatform.swift`.
 
-The gate fails if either file disappears or if a new core/platform production file is not
-classified explicitly. `LiveCoreAudioCalls.swift` is the accepted direct platform boundary: it
-contains CoreAudio property calls, raw C callback/pointer marshalling, and no product fallback,
-provider, capture-scope, or retention policy. The executable `main.swift` is the composition and
-Darwin signal boundary. These two files require compile/package/signing, packaged E2E, and
-target-Mac CoreAudio lifecycle evidence; this classification does not convert their live behavior
-into structurally proven behavior.
+The gate fails if any required file disappears or if a new core/platform production file is not
+classified explicitly. `LiveCoreAudioCalls.swift` and `LiveProcessMetadataCalls.swift` are the
+accepted direct platform boundaries. They contain only CoreAudio property calls, raw C
+callback/pointer marshalling, AppKit process lookup, and libproc parent-PID lookup. Product
+fallback, cue-owned classification, provider, capture-scope, and retention policy remain in the
+instrumented files. The executable `main.swift` is the composition and Darwin signal boundary.
+These direct boundaries require compile/package/signing, packaged E2E, and target-Mac evidence;
+this classification does not convert their live behavior into structurally proven behavior.
 
 ## 4. Mutation policy
 

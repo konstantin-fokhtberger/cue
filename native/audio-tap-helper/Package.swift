@@ -18,7 +18,10 @@ let package = Package(
     .target(
       name: "CueAudioTapPlatform",
       dependencies: ["CueAudioTapCore"],
-      linkerSettings: [.linkedFramework("CoreAudio")]
+      linkerSettings: [
+        .linkedFramework("AppKit"),
+        .linkedFramework("CoreAudio"),
+      ]
     ),
     .executableTarget(
       name: "CueAudioTapHelper",

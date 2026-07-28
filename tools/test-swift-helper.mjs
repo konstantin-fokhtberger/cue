@@ -66,6 +66,9 @@ const unexpectedPolicyFiles = coverage.data[0].files.filter(
     !requiredProductionFiles.some((relativePath) => file.filename.endsWith(relativePath)) &&
     !file.filename.endsWith(
       path.join('Sources', 'CueAudioTapPlatform', 'LiveCoreAudioCalls.swift'),
+    ) &&
+    !file.filename.endsWith(
+      path.join('Sources', 'CueAudioTapPlatform', 'LiveProcessMetadataCalls.swift'),
     ),
 );
 if (unexpectedPolicyFiles.length > 0) {

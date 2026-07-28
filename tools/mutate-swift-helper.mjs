@@ -344,13 +344,13 @@ const resolverMutations = [
 const platformMutations = [
   {
     id: 'platform-process-unknown-filter',
-    from: 'for processID in processIDs where processID != 0 {',
-    to: 'for processID in processIDs where true {',
+    from: 'var deviceIDs = [UInt32]()\n\n    for processID in processIDs where processID != 0 {',
+    to: 'var deviceIDs = [UInt32]()\n\n    for processID in processIDs where true {',
   },
   {
     id: 'platform-running-output-required',
-    from: 'running != 0',
-    to: 'running == 0',
+    from: 'guard case .success(let running) = calls.isRunningOutput(processID: processID),\n        running != 0\n      else {',
+    to: 'guard case .success(let running) = calls.isRunningOutput(processID: processID),\n        running == 0\n      else {',
   },
   {
     id: 'platform-device-unknown-filter',
@@ -476,6 +476,66 @@ const platformMutations = [
     id: 'platform-destroy-tap-forwarding',
     from: 'calls.destroyTap(tapID)',
     to: '_ = tapID',
+  },
+  {
+    id: 'platform-inventory-process-unknown-filter',
+    from: 'var deviceUIDByID = [UInt32: String]()\n\n    for processID in processIDs where processID != 0 {',
+    to: 'var deviceUIDByID = [UInt32: String]()\n\n    for processID in processIDs where true {',
+  },
+  {
+    id: 'platform-inventory-running-output-required',
+    from: 'running != 0,\n        case .success(let pid) = calls.processPID(processID: processID),\n        pid > 0',
+    to: 'running == 0,\n        case .success(let pid) = calls.processPID(processID: processID),\n        pid > 0',
+  },
+  {
+    id: 'platform-inventory-positive-pid-required',
+    from: 'case .success(let pid) = calls.processPID(processID: processID),\n        pid > 0',
+    to: 'case .success(let pid) = calls.processPID(processID: processID),\n        pid == 0',
+  },
+  {
+    id: 'platform-inventory-device-unknown-filter',
+    from: 'for deviceID in deviceIDs where deviceID != 0 {',
+    to: 'for deviceID in deviceIDs where true {',
+  },
+  {
+    id: 'platform-inventory-device-uid-cache',
+    from: 'if let cached = deviceUIDByID[deviceID] {',
+    to: 'if false, let cached = deviceUIDByID[deviceID] {',
+  },
+  {
+    id: 'platform-inventory-coreaudio-bundle-forwarding',
+    from: 'coreAudioBundleIDByPID[pid] = bundleIdentifier',
+    to: 'coreAudioBundleIDByPID[pid] = nil',
+  },
+  {
+    id: 'platform-inventory-process-node-deduplication',
+    from: 'if nodes[currentPID] != nil {',
+    to: 'if false {',
+  },
+  {
+    id: 'platform-inventory-responsible-node-stop',
+    from: 'if node.isCueOwned || node.isRegularApplication {',
+    to: 'if false {',
+  },
+  {
+    id: 'platform-inventory-parent-traversal',
+    from: 'currentPID = parentPID',
+    to: 'currentPID = node.pid',
+  },
+  {
+    id: 'platform-inventory-root-bundle-fallback',
+    from: 'coreAudioBundleIdentifier: currentPID == observation.pid\n            ? coreAudioBundleIDByPID[currentPID] : nil',
+    to: 'coreAudioBundleIdentifier: false\n            ? coreAudioBundleIDByPID[currentPID] : nil',
+  },
+  {
+    id: 'platform-inventory-bundle-fallback',
+    from: 'normalized(node.bundleIdentifier)\n      ?? normalized(coreAudioBundleIdentifier)',
+    to: 'normalized(node.bundleIdentifier)\n      ?? nil',
+  },
+  {
+    id: 'platform-inventory-cue-prefix-exclusion',
+    from: '|| bundleIdentifier?.hasPrefix("com.cue.overlay.") == true',
+    to: '|| false',
   },
 ];
 const mutations = [
