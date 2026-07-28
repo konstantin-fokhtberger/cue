@@ -204,6 +204,7 @@ final class CaptureScopeResolverTests: XCTestCase {
     XCTAssertEqual(
       try resolver.resolve(selection, in: inventory),
       VerifiedApplicationScope(
+        inventoryGeneration: 9,
         identity: ResponsibleApplicationIdentity(
           pid: 50,
           bundleIdentifier: "com.google.Chrome",

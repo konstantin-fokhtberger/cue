@@ -19,7 +19,6 @@ const { BoundedPcmBuffer } = require('./src/core/bounded-pcm-buffer');
 let win = null;
 let registeredAssistShortcut = null;
 let systemAudioCapture = null;
-let systemAudioCaptureConfiguration = null;
 let systemAudioCaptureScope = null;
 let canDispatchSystemPcm = () => false;
 let applicationCaptureScopeCoordinator = null;
@@ -168,10 +167,22 @@ function stopFlushLoop() {
 
 // -------- capture toggle --------
 function setCapturing(active) {
+  let captureConfiguration = null;
+  if (active) {
+    try {
+      captureConfiguration = applicationCaptureScopeCoordinator.captureConfiguration();
+    } catch (error) {
+      send('system-capture:state', {
+        status: 'error',
+        code: error && error.code ? error.code : 'application-selection-required',
+      });
+      return false;
+    }
+  }
   state.capturing = active;
   if (active) {
     startFlushLoop();
-    systemAudioCapture?.start(systemAudioCaptureConfiguration).catch((error) => {
+    systemAudioCapture?.start(captureConfiguration).catch((error) => {
       console.log('[cue] system audio start failed:', error && error.code);
     });
   } else {
@@ -353,11 +364,9 @@ app.whenReady().then(async () => {
   const { NativeSystemAudioCapture } = await import('./src/core/native-system-audio-capture.mjs');
   const { NativeApplicationInventory } =
     await import('./src/core/native-application-inventory.mjs');
-  const { DIAGNOSTIC_GLOBAL_CAPTURE } = await import('./src/core/helper-control-protocol.mjs');
   ({ canDispatchSystemPcm } = await import('./src/core/capture-scope-policy.mjs'));
   const { ApplicationCaptureScopeCoordinator } =
     await import('./src/core/application-capture-scope.mjs');
-  systemAudioCaptureConfiguration = DIAGNOSTIC_GLOBAL_CAPTURE;
   const helperPath =
     e2eRuntime.enabled && process.env.CUE_E2E_AUDIO_HELPER_PATH
       ? process.env.CUE_E2E_AUDIO_HELPER_PATH

@@ -117,6 +117,36 @@ const coreMutations = [
     to: 'guard tapID == nil, aggregateID == nil, !ioCreated, ioStarted else {',
   },
   {
+    id: 'application-process-set-forwarding',
+    from: 'processObjectIDs: verifiedScope.audioProcessObjectIDs',
+    to: 'processObjectIDs: []',
+  },
+  {
+    id: 'application-output-devices-forwarding',
+    from: 'outputDeviceUIDs: verifiedScope.outputDeviceUIDs',
+    to: 'outputDeviceUIDs: []',
+  },
+  {
+    id: 'application-selection-tracked',
+    from: 'applicationSelection = selection',
+    to: 'applicationSelection = nil',
+  },
+  {
+    id: 'application-effective-scope-tracked',
+    from: 'verifiedApplicationScope = verifiedScope',
+    to: 'verifiedApplicationScope = nil',
+  },
+  {
+    id: 'application-effective-scope-emitted',
+    from: 'scope: .application(verifiedScope)',
+    to: 'scope: .diagnosticGlobal',
+  },
+  {
+    id: 'application-scope-health-comparison',
+    from: '(try? platform.verifyApplicationScope(applicationSelection)) == verifiedApplicationScope',
+    to: '(try? platform.verifyApplicationScope(applicationSelection)) != verifiedApplicationScope',
+  },
+  {
     id: 'tap-resource-tracked',
     from: 'tapID = createdTapID',
     to: 'tapID = nil',
@@ -177,6 +207,11 @@ const coreMutations = [
     to: '"event": "active",',
   },
   {
+    id: 'protocol-application-verified',
+    from: '"verified": true,',
+    to: '"verified": false,',
+  },
+  {
     id: 'protocol-stopped-name',
     from: '"event": "stopped",',
     to: '"event": "idle",',
@@ -220,6 +255,11 @@ const coreMutations = [
     id: 'runner-waits-for-termination',
     from: 'try termination.wait()',
     to: '_ = termination',
+  },
+  {
+    id: 'runner-requested-scope-forwarding',
+    from: 'let started = try session.start(scope: scope)',
+    to: 'let started = CaptureStart(sampleRate: try session.start(), scope: .diagnosticGlobal)',
   },
   {
     id: 'runner-inventory-generation-forwarding',
@@ -269,19 +309,64 @@ const controlMutations = [
     to: 'scopeKind != "diagnostic-global"',
   },
   {
+    id: 'control-application-envelope-required',
+    from: 'Set(scope.keys) == [\n          "browserWideAcknowledged",\n          "bundleIdentifier",\n          "inventoryGeneration",\n          "kind",\n          "responsiblePid",\n        ],',
+    to: 'true,',
+  },
+  {
+    id: 'control-application-kind-required',
+    from: 'scopeKind == "application",',
+    to: 'true,',
+  },
+  {
+    id: 'control-application-positive-generation',
+    from: 'let generation = scope["inventoryGeneration"] as? Int,\n        generation > 0,',
+    to: 'let generation = scope["inventoryGeneration"] as? Int,\n        generation >= 0,',
+  },
+  {
+    id: 'control-application-positive-pid',
+    from: 'let responsiblePID = scope["responsiblePid"] as? Int,\n        responsiblePID > 0,',
+    to: 'let responsiblePID = scope["responsiblePid"] as? Int,\n        responsiblePID >= 0,',
+  },
+  {
+    id: 'control-application-bundle-required',
+    from: '!bundleIdentifier.isEmpty,',
+    to: 'true,',
+  },
+  {
+    id: 'control-application-generation-forwarding',
+    from: 'inventoryGeneration: UInt64(generation),',
+    to: 'inventoryGeneration: UInt64(generation + 1),',
+  },
+  {
+    id: 'control-application-pid-forwarding',
+    from: 'responsiblePID: Int32(responsiblePID),',
+    to: 'responsiblePID: Int32(responsiblePID + 1),',
+  },
+  {
+    id: 'control-application-bundle-forwarding',
+    from: 'bundleIdentifier: bundleIdentifier,',
+    to: 'bundleIdentifier: "",',
+  },
+  {
+    id: 'control-application-acknowledgement-forwarding',
+    from: 'browserWideAcknowledged: browserWideAcknowledged',
+    to: 'browserWideAcknowledged: !browserWideAcknowledged',
+  },
+  {
     id: 'control-inventory-envelope-required',
     from: 'Set(object.keys) == ["command", "generation", "protocolVersion"],',
     to: 'true,',
   },
   {
     id: 'control-inventory-positive-generation',
-    from: 'generation > 0,',
-    to: 'generation >= 0,',
+    from: 'let generation = object["generation"] as? Int,\n        generation > 0,',
+    to: 'let generation = object["generation"] as? Int,\n        generation >= 0,',
   },
   {
     id: 'control-inventory-safe-generation',
-    from: 'generation <= 9_007_199_254_740_991',
-    to: 'generation < 9_007_199_254_740_991',
+    from: 'Set(object.keys) == ["command", "generation", "protocolVersion"],\n        let generation = object["generation"] as? Int,\n        generation > 0,\n        generation <= 9_007_199_254_740_991',
+    to: 'Set(object.keys) == ["command", "generation", "protocolVersion"],\n        let generation = object["generation"] as? Int,\n        generation > 0,\n        generation < 9_007_199_254_740_991',
   },
   {
     id: 'control-inventory-generation-forwarding',
@@ -402,6 +487,21 @@ const resolverMutations = [
   },
 ];
 const platformMutations = [
+  {
+    id: 'platform-application-process-required',
+    from: 'guard !processObjectIDs.isEmpty else {',
+    to: 'guard true else {',
+  },
+  {
+    id: 'platform-application-process-forwarding',
+    from: 'calls.createApplicationTap(processObjectIDs: processObjectIDs),',
+    to: 'calls.createApplicationTap(processObjectIDs: []),',
+  },
+  {
+    id: 'platform-application-generation-forwarding',
+    from: 'in: applicationCaptureInventory(generation: selection.inventoryGeneration)',
+    to: 'in: applicationCaptureInventory(generation: selection.inventoryGeneration + 1)',
+  },
   {
     id: 'platform-process-unknown-filter',
     from: 'var deviceIDs = [UInt32]()\n\n    for processID in processIDs where processID != 0 {',

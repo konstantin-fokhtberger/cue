@@ -114,15 +114,18 @@ public struct ApplicationScopeSelection: Equatable {
 }
 
 public struct VerifiedApplicationScope: Equatable {
+  public let inventoryGeneration: UInt64
   public let identity: ResponsibleApplicationIdentity
   public let audioProcessObjectIDs: [UInt32]
   public let outputDeviceUIDs: [String]
 
   public init(
+    inventoryGeneration: UInt64,
     identity: ResponsibleApplicationIdentity,
     audioProcessObjectIDs: [UInt32],
     outputDeviceUIDs: [String]
   ) {
+    self.inventoryGeneration = inventoryGeneration
     self.identity = identity
     self.audioProcessObjectIDs = audioProcessObjectIDs
     self.outputDeviceUIDs = outputDeviceUIDs
@@ -221,6 +224,7 @@ public struct CaptureScopeResolver {
       throw CaptureScopeResolutionError.missingOutputDevice
     }
     return VerifiedApplicationScope(
+      inventoryGeneration: inventory.generation,
       identity: identity,
       audioProcessObjectIDs: source.audioProcessObjectIDs,
       outputDeviceUIDs: source.outputDeviceUIDs

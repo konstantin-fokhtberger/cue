@@ -33,6 +33,7 @@ private final class FakePlatform: AudioTapPlatform {
     sampleRate: 48_000
   )
   var outputDeviceUIDs = ["output-a", "output-b"]
+  var verifiedScopeOverride: VerifiedApplicationScope?
   var operations = [String]()
   var payloadHandler: ((AudioPayload) -> Void)?
 
@@ -40,6 +41,31 @@ private final class FakePlatform: AudioTapPlatform {
     operations.append(Operation.createTap.rawValue)
     try failIfRequested(.createTap)
     return 11
+  }
+
+  func createApplicationTap(processObjectIDs: [UInt32]) throws -> UInt32 {
+    operations.append(
+      "createApplicationTap:\(processObjectIDs.map(String.init).joined(separator: ","))"
+    )
+    try failIfRequested(.createTap)
+    return 11
+  }
+
+  func verifyApplicationScope(
+    _ selection: ApplicationScopeSelection
+  ) throws -> VerifiedApplicationScope {
+    operations.append("verifyApplicationScope:\(selection.responsiblePID)")
+    return verifiedScopeOverride
+      ?? VerifiedApplicationScope(
+        inventoryGeneration: selection.inventoryGeneration,
+        identity: ResponsibleApplicationIdentity(
+          pid: selection.responsiblePID,
+          bundleIdentifier: selection.bundleIdentifier,
+          displayName: "Selected app"
+        ),
+        audioProcessObjectIDs: [101],
+        outputDeviceUIDs: outputDeviceUIDs
+      )
   }
 
   func tapUID(for tapID: UInt32) throws -> String {
@@ -120,8 +146,35 @@ private final class FakeSession: AudioSession {
     return sampleRate
   }
 
+  func start(scope: CaptureScope) throws -> CaptureStart {
+    let sampleRate = try start()
+    let effectiveScope: EffectiveCaptureScope
+    switch scope {
+    case .diagnosticGlobal:
+      effectiveScope = .diagnosticGlobal
+    case .application(let selection):
+      effectiveScope = .application(
+        VerifiedApplicationScope(
+          inventoryGeneration: selection.inventoryGeneration,
+          identity: ResponsibleApplicationIdentity(
+            pid: selection.responsiblePID,
+            bundleIdentifier: selection.bundleIdentifier,
+            displayName: "Selected app"
+          ),
+          audioProcessObjectIDs: [101],
+          outputDeviceUIDs: ["output-a"]
+        )
+      )
+    }
+    return CaptureStart(sampleRate: sampleRate, scope: effectiveScope)
+  }
+
   func stop() {
     operations.append("stop")
+  }
+
+  func scopeIsValid() -> Bool {
+    true
   }
 
   func drain() {
@@ -173,6 +226,10 @@ final class HelperErrorTests: XCTestCase {
     XCTAssertEqual(
       HelperError.missingOutputDevice.description,
       "No output device is available for the process tap."
+    )
+    XCTAssertEqual(
+      HelperError.missingAudioProcess.description,
+      "No audio process is available for the application tap."
     )
     XCTAssertEqual(
       HelperError.unsupportedFormat.description,
@@ -413,6 +470,7 @@ final class AudioTapSessionTests: XCTestCase {
   func testSuccessfulLifecycleForwardsPayloadAndCleansUpExactlyOnce() throws {
     let (session, platform, writer, drainCount) = makeHarness()
 
+    XCTAssertTrue(session.scopeIsValid())
     XCTAssertEqual(try session.start(), 48_000)
     XCTAssertThrowsError(try session.start()) {
       XCTAssertEqual($0 as? HelperError, .invalidState)
@@ -444,6 +502,72 @@ final class AudioTapSessionTests: XCTestCase {
         "destroyTap:11",
       ]
     )
+  }
+
+  func testExplicitDiagnosticScopeRemainsUnverified() throws {
+    let (session, _, _, _) = makeHarness()
+
+    XCTAssertEqual(
+      try session.start(scope: .diagnosticGlobal),
+      CaptureStart(sampleRate: 48_000, scope: .diagnosticGlobal)
+    )
+    session.stop()
+    XCTAssertTrue(session.scopeIsValid())
+  }
+
+  func testApplicationScopeUsesOnlyVerifiedProcessObjectsAndTheirOutputDevices() throws {
+    let (session, platform, _, _) = makeHarness()
+    let selection = ApplicationScopeSelection(
+      inventoryGeneration: 7,
+      responsiblePID: 2_000,
+      bundleIdentifier: "com.google.Chrome",
+      browserWideAcknowledged: true
+    )
+
+    XCTAssertEqual(
+      try session.start(scope: .application(selection)),
+      CaptureStart(
+        sampleRate: 48_000,
+        scope: .application(
+          VerifiedApplicationScope(
+            inventoryGeneration: 7,
+            identity: ResponsibleApplicationIdentity(
+              pid: 2_000,
+              bundleIdentifier: "com.google.Chrome",
+              displayName: "Selected app"
+            ),
+            audioProcessObjectIDs: [101],
+            outputDeviceUIDs: ["output-a", "output-b"]
+          )
+        )
+      )
+    )
+    XCTAssertFalse(platform.operations.contains("createTap"))
+    XCTAssertFalse(platform.operations.contains("outputDevices"))
+    XCTAssertEqual(
+      Array(platform.operations.prefix(3)),
+      [
+        "verifyApplicationScope:2000",
+        "createApplicationTap:101",
+        "tapUID:11",
+      ]
+    )
+    XCTAssertTrue(session.scopeIsValid())
+    platform.verifiedScopeOverride = VerifiedApplicationScope(
+      inventoryGeneration: 7,
+      identity: ResponsibleApplicationIdentity(
+        pid: 2_001,
+        bundleIdentifier: "com.google.Chrome",
+        displayName: "Selected app"
+      ),
+      audioProcessObjectIDs: [101],
+      outputDeviceUIDs: ["output-a", "output-b"]
+    )
+    XCTAssertFalse(session.scopeIsValid())
+    XCTAssertThrowsError(try session.start(scope: .application(selection))) {
+      XCTAssertEqual($0 as? HelperError, .invalidState)
+    }
+    session.stop()
   }
 
   func testPartialStartFailuresCleanUpAcquiredResourcesInReverseOrder() {
@@ -566,6 +690,29 @@ final class HelperEventEncoderTests: XCTestCase {
         as: UTF8.self
       ),
       "{\"channels\":1,\"event\":\"started\",\"format\":\"float32le\",\"sampleRate\":48000,\"scope\":{\"kind\":\"diagnostic-global\",\"verified\":false}}\n"
+    )
+  }
+
+  func testStartedApplicationEventContainsOnlyVerifiedSanitizedIdentity() throws {
+    let scope = VerifiedApplicationScope(
+      inventoryGeneration: 7,
+      identity: ResponsibleApplicationIdentity(
+        pid: 2_000,
+        bundleIdentifier: "com.google.Chrome",
+        displayName: "Google Chrome"
+      ),
+      audioProcessObjectIDs: [101, 102],
+      outputDeviceUIDs: ["sony"]
+    )
+
+    XCTAssertEqual(
+      String(
+        decoding: try encoder.encodeLine(
+          .started(sampleRate: 48_000, scope: .application(scope))
+        ),
+        as: UTF8.self
+      ),
+      "{\"channels\":1,\"event\":\"started\",\"format\":\"float32le\",\"sampleRate\":48000,\"scope\":{\"bundleIdentifier\":\"com.google.Chrome\",\"displayName\":\"Google Chrome\",\"inventoryGeneration\":7,\"kind\":\"application\",\"responsiblePid\":2000,\"verified\":true}}\n"
     )
   }
 
@@ -693,6 +840,48 @@ final class HelperRunnerTests: XCTestCase {
         .started(sampleRate: 48_000, scope: .diagnosticGlobal),
         .stopped(metrics: session.snapshotValue),
       ])
+  }
+
+  func testApplicationCommandForwardsRequestedAndEffectiveScopeWithoutDowngrade() {
+    let session = FakeSession()
+    let termination = FakeTermination()
+    let selection = ApplicationScopeSelection(
+      inventoryGeneration: 7,
+      responsiblePID: 2_000,
+      bundleIdentifier: "us.zoom.xos",
+      browserWideAcknowledged: false
+    )
+    termination.configuration = .capture(protocolVersion: 1, scope: .application(selection))
+    var events = [HelperEvent]()
+    let runner = HelperRunner(
+      session: session,
+      termination: termination,
+      encode: {
+        events.append($0)
+        return Data([UInt8(events.count)])
+      },
+      writeEvent: { _ in }
+    )
+
+    XCTAssertEqual(runner.run(), 0)
+    XCTAssertEqual(
+      events.first,
+      .started(
+        sampleRate: 48_000,
+        scope: .application(
+          VerifiedApplicationScope(
+            inventoryGeneration: 7,
+            identity: ResponsibleApplicationIdentity(
+              pid: 2_000,
+              bundleIdentifier: "us.zoom.xos",
+              displayName: "Selected app"
+            ),
+            audioProcessObjectIDs: [101],
+            outputDeviceUIDs: ["output-a"]
+          )
+        )
+      )
+    )
   }
 
   func testInventoryCommandWritesOneSnapshotWithoutStartingOrWaiting() {

@@ -25,6 +25,7 @@ export class NativeSystemAudioCapture {
   #pendingResolve = null;
   #prestartAudio = [];
   #prestartBytes = 0;
+  #requestedScope = null;
   #resampler = null;
   #resource = null;
   #spawn;
@@ -54,6 +55,7 @@ export class NativeSystemAudioCapture {
 
     const generation = {};
     this.#generation = generation;
+    this.#requestedScope = { ...configuration.scope };
     this.#metrics = createMetrics();
     const child = this.#spawn(this.#helperPath, [], {
       stdio: ['pipe', 'pipe', 'pipe'],
@@ -154,13 +156,7 @@ export class NativeSystemAudioCapture {
       this.#fail(generation, 'unsupported-helper-format', true);
       return;
     }
-    if (
-      event.scope === null ||
-      typeof event.scope !== 'object' ||
-      event.scope.kind !== 'diagnostic-global' ||
-      event.scope.verified !== false ||
-      Object.keys(event.scope).length !== 2
-    ) {
+    if (!validEffectiveScope(event.scope, this.#requestedScope)) {
       this.#fail(generation, 'invalid-helper-scope', true);
       return;
     }
@@ -176,7 +172,7 @@ export class NativeSystemAudioCapture {
     this.#pendingReject = null;
     this.#startPromise = null;
     this.#onState({
-      status: 'diagnostic',
+      status: event.scope.verified ? 'active' : 'diagnostic',
       inputSampleRate: event.sampleRate,
       scope: { ...event.scope },
     });
@@ -230,9 +226,44 @@ export class NativeSystemAudioCapture {
     this.#prestartBytes = 0;
     this.#resampler = null;
     this.#resource = null;
+    this.#requestedScope = null;
     this.#startPromise = null;
     this.#stderrRemainder = '';
   }
+}
+
+function validEffectiveScope(scope, requestedScope) {
+  if (
+    requestedScope.kind === 'diagnostic-global' &&
+    plainObjectWithKeys(scope, ['kind', 'verified'])
+  ) {
+    return scope.kind === 'diagnostic-global' && scope.verified === false;
+  }
+  return (
+    plainObjectWithKeys(scope, [
+      'bundleIdentifier',
+      'displayName',
+      'inventoryGeneration',
+      'kind',
+      'responsiblePid',
+      'verified',
+    ]) &&
+    scope.kind === 'application' &&
+    scope.verified === true &&
+    scope.inventoryGeneration === requestedScope.inventoryGeneration &&
+    scope.responsiblePid === requestedScope.responsiblePid &&
+    scope.bundleIdentifier === requestedScope.bundleIdentifier &&
+    scope.displayName === requestedScope.displayName
+  );
+}
+
+function plainObjectWithKeys(value, keys) {
+  return (
+    value !== null &&
+    typeof value === 'object' &&
+    !Array.isArray(value) &&
+    Object.keys(value).sort().join('\0') === keys.join('\0')
+  );
 }
 
 function ignoreDetachedStreamError() {}

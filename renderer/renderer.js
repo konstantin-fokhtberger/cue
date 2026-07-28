@@ -61,6 +61,7 @@ import { applicationSourceLabel } from '../src/core/application-capture-scope.mj
   let availableOutputLabels = new Map([['default', 'system default']]);
   let applicationInventory = null;
   let requestedApplicationScope = null;
+  let effectiveApplicationScope = null;
   const cuePlayback = new Audio();
   let diagnosticState = createAudioDiagnosticState();
   let diagnosticGeneration = 0;
@@ -406,15 +407,21 @@ import { applicationSourceLabel } from '../src/core/application-capture-scope.mj
     }
     renderApplicationInventory();
   });
-  cue.on('system-capture:state', ({ status, code }) => {
+  cue.on('system-capture:state', ({ status, code, scope }) => {
     document.documentElement.dataset.systemCaptureStatus = status;
     if (status === 'active') {
+      effectiveApplicationScope = scope;
       setSystemCaptureHealthy();
     } else if (status === 'diagnostic') {
+      effectiveApplicationScope = null;
       setSystemCaptureFailure('unverified-capture-scope');
     } else if (status === 'error') {
+      effectiveApplicationScope = null;
       setSystemCaptureFailure(code || 'initialization-failed');
+    } else if (status === 'idle') {
+      effectiveApplicationScope = null;
     }
+    renderApplicationInventory();
   });
   cue.on('llm:start', ({ userBubble, small }) => {
     clearMessages();
@@ -624,7 +631,9 @@ import { applicationSourceLabel } from '../src/core/application-capture-scope.mj
       status.textContent =
         'Requested: ' +
         requestedApplicationScope.displayName +
-        '. Effective: not verified until native capture starts.';
+        (effectiveApplicationScope
+          ? '. Effective: verified ' + effectiveApplicationScope.displayName + '.'
+          : '. Effective: not verified until native capture starts.');
       status.className = 's-device-status success';
     } else {
       const unresolved = applicationInventory

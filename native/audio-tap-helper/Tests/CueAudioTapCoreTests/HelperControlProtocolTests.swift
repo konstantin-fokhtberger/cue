@@ -14,6 +14,25 @@ final class HelperControlProtocolTests: XCTestCase {
     )
     XCTAssertEqual(
       try HelperControlDecoder().decode(
+        Data(
+          #"{"command":"capture","protocolVersion":1,"scope":{"kind":"application","inventoryGeneration":42,"responsiblePid":2000,"bundleIdentifier":"com.google.Chrome","browserWideAcknowledged":true}}"#
+            .utf8
+        )
+      ),
+      .capture(
+        protocolVersion: 1,
+        scope: .application(
+          ApplicationScopeSelection(
+            inventoryGeneration: 42,
+            responsiblePID: 2_000,
+            bundleIdentifier: "com.google.Chrome",
+            browserWideAcknowledged: true
+          )
+        )
+      )
+    )
+    XCTAssertEqual(
+      try HelperControlDecoder().decode(
         Data(#"{"command":"inventory","generation":42,"protocolVersion":1}"#.utf8)
       ),
       .inventory(protocolVersion: 1, generation: 42)
@@ -45,6 +64,21 @@ final class HelperControlProtocolTests: XCTestCase {
         #"{"command":"inventory","generation":1,"protocolVersion":1,"scope":{"kind":"diagnostic-global"}}"#
           .utf8),
       Data(#"{"command":"capture","protocolVersion":1,"scope":{"kind":"application"}}"#.utf8),
+      Data(
+        #"{"command":"capture","protocolVersion":1,"scope":{"kind":"other","inventoryGeneration":1,"responsiblePid":2000,"bundleIdentifier":"com.google.Chrome","browserWideAcknowledged":true}}"#
+          .utf8),
+      Data(
+        #"{"command":"capture","protocolVersion":1,"scope":{"kind":"application","inventoryGeneration":1,"responsiblePid":2000,"bundleIdentifier":"com.google.Chrome","browserWideAcknowledged":true,"extra":true}}"#
+          .utf8),
+      Data(
+        #"{"command":"capture","protocolVersion":1,"scope":{"kind":"application","inventoryGeneration":0,"responsiblePid":2000,"bundleIdentifier":"com.google.Chrome","browserWideAcknowledged":true}}"#
+          .utf8),
+      Data(
+        #"{"command":"capture","protocolVersion":1,"scope":{"kind":"application","inventoryGeneration":1,"responsiblePid":0,"bundleIdentifier":"com.google.Chrome","browserWideAcknowledged":true}}"#
+          .utf8),
+      Data(
+        #"{"command":"capture","protocolVersion":1,"scope":{"kind":"application","inventoryGeneration":1,"responsiblePid":2000,"bundleIdentifier":"","browserWideAcknowledged":true}}"#
+          .utf8),
       Data(
         #"{"command":"capture","extra":true,"protocolVersion":1,"scope":{"kind":"diagnostic-global"}}"#
           .utf8

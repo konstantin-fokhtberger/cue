@@ -4,6 +4,7 @@ public enum HelperError: Error, CustomStringConvertible, Equatable {
   case operation(name: String, status: Int32)
   case missingTapUID
   case missingOutputDevice
+  case missingAudioProcess
   case unsupportedFormat
   case invalidState
   case controlClosed
@@ -19,6 +20,8 @@ public enum HelperError: Error, CustomStringConvertible, Equatable {
       return "The process tap did not expose a UID."
     case .missingOutputDevice:
       return "No output device is available for the process tap."
+    case .missingAudioProcess:
+      return "No audio process is available for the application tap."
     case .unsupportedFormat:
       return "The tap did not provide mono Float32 linear PCM."
     case .invalidState:
@@ -178,6 +181,10 @@ public final class BoundedSignalWriter {
 
 public protocol AudioTapPlatform: AnyObject {
   func createTap() throws -> UInt32
+  func createApplicationTap(processObjectIDs: [UInt32]) throws -> UInt32
+  func verifyApplicationScope(
+    _ selection: ApplicationScopeSelection
+  ) throws -> VerifiedApplicationScope
   func tapUID(for tapID: UInt32) throws -> String
   func tapFormat(for tapID: UInt32) throws -> TapFormat
   func runningOutputDeviceUIDs() throws -> [String]
@@ -195,9 +202,26 @@ public protocol AudioTapPlatform: AnyObject {
 
 public protocol AudioSession: AnyObject {
   func start() throws -> Double
+  func start(scope: CaptureScope) throws -> CaptureStart
+  func scopeIsValid() -> Bool
   func stop()
   func drain()
   func snapshot() -> SignalSnapshot
+}
+
+public enum EffectiveCaptureScope: Equatable {
+  case diagnosticGlobal
+  case application(VerifiedApplicationScope)
+}
+
+public struct CaptureStart: Equatable {
+  public let sampleRate: Double
+  public let scope: EffectiveCaptureScope
+
+  public init(sampleRate: Double, scope: EffectiveCaptureScope) {
+    self.sampleRate = sampleRate
+    self.scope = scope
+  }
 }
 
 public final class AudioTapSession: AudioSession {
@@ -208,6 +232,8 @@ public final class AudioTapSession: AudioSession {
   private var aggregateID: UInt32?
   private var ioCreated = false
   private var ioStarted = false
+  private var applicationSelection: ApplicationScopeSelection?
+  private var verifiedApplicationScope: VerifiedApplicationScope?
 
   public init(
     platform: AudioTapPlatform,
@@ -224,19 +250,58 @@ public final class AudioTapSession: AudioSession {
   }
 
   public func start() throws -> Double {
+    try requireIdle()
+    return try startDiagnostic()
+  }
+
+  public func start(scope: CaptureScope) throws -> CaptureStart {
+    try requireIdle()
+    switch scope {
+    case .diagnosticGlobal:
+      return CaptureStart(sampleRate: try startDiagnostic(), scope: .diagnosticGlobal)
+    case .application(let selection):
+      let verifiedScope = try platform.verifyApplicationScope(selection)
+      let createdTapID = try platform.createApplicationTap(
+        processObjectIDs: verifiedScope.audioProcessObjectIDs
+      )
+      let sampleRate = try start(
+        createdTapID: createdTapID,
+        outputDeviceUIDs: verifiedScope.outputDeviceUIDs
+      )
+      applicationSelection = selection
+      verifiedApplicationScope = verifiedScope
+      return CaptureStart(
+        sampleRate: sampleRate,
+        scope: .application(verifiedScope)
+      )
+    }
+  }
+
+  private func startDiagnostic() throws -> Double {
+    do {
+      let createdTapID = try platform.createTap()
+      return try start(createdTapID: createdTapID, outputDeviceUIDs: nil)
+    } catch {
+      stop()
+      throw error
+    }
+  }
+
+  private func requireIdle() throws {
     guard tapID == nil, aggregateID == nil, !ioCreated, !ioStarted else {
       throw HelperError.invalidState
     }
+  }
 
+  private func start(createdTapID: UInt32, outputDeviceUIDs: [String]?) throws -> Double {
     do {
-      let createdTapID = try platform.createTap()
       tapID = createdTapID
       let tapUID = try platform.tapUID(for: createdTapID)
       guard !tapUID.isEmpty else {
         throw HelperError.missingTapUID
       }
       let sampleRate = try platform.tapFormat(for: createdTapID).validatedSampleRate()
-      let outputDeviceUIDs = try platform.runningOutputDeviceUIDs()
+      let outputDeviceUIDs = try outputDeviceUIDs ?? platform.runningOutputDeviceUIDs()
       guard !outputDeviceUIDs.isEmpty else {
         throw HelperError.missingOutputDevice
       }
@@ -259,6 +324,8 @@ public final class AudioTapSession: AudioSession {
   }
 
   public func stop() {
+    applicationSelection = nil
+    verifiedApplicationScope = nil
     if ioStarted, let aggregateID {
       platform.stopIO(aggregateID: aggregateID)
       ioStarted = false
@@ -284,10 +351,17 @@ public final class AudioTapSession: AudioSession {
   public func snapshot() -> SignalSnapshot {
     writer.snapshot()
   }
+
+  public func scopeIsValid() -> Bool {
+    guard let applicationSelection, let verifiedApplicationScope else {
+      return true
+    }
+    return (try? platform.verifyApplicationScope(applicationSelection)) == verifiedApplicationScope
+  }
 }
 
 public enum HelperEvent: Equatable {
-  case started(sampleRate: Double, scope: CaptureScope)
+  case started(sampleRate: Double, scope: EffectiveCaptureScope)
   case stopped(metrics: SignalSnapshot)
   case inventory(ApplicationCaptureInventory)
   case error(message: String)
@@ -305,10 +379,7 @@ public struct HelperEventEncoder {
         "event": "started",
         "format": "float32le",
         "sampleRate": sampleRate,
-        "scope": [
-          "kind": scope.kind,
-          "verified": false,
-        ],
+        "scope": encodeEffectiveScope(scope),
       ]
     case .stopped(let metrics):
       object = [
@@ -332,6 +403,22 @@ public struct HelperEventEncoder {
     var data = try JSONSerialization.data(withJSONObject: object, options: [.sortedKeys])
     data.append(0x0A)
     return data
+  }
+
+  private func encodeEffectiveScope(_ scope: EffectiveCaptureScope) -> [String: Any] {
+    switch scope {
+    case .diagnosticGlobal:
+      return ["kind": "diagnostic-global", "verified": false]
+    case .application(let value):
+      return [
+        "bundleIdentifier": value.identity.bundleIdentifier,
+        "displayName": value.identity.displayName,
+        "inventoryGeneration": value.inventoryGeneration,
+        "kind": "application",
+        "responsiblePid": value.identity.pid,
+        "verified": true,
+      ]
+    }
   }
 
   private func encodeInventorySource(_ source: ApplicationCaptureSource) -> [String: Any] {
@@ -409,8 +496,8 @@ public final class HelperRunner {
       let configuration = try termination.readConfiguration()
       switch configuration {
       case .capture(_, let scope):
-        let sampleRate = try session.start()
-        try writeEvent(encode(.started(sampleRate: sampleRate, scope: scope)))
+        let started = try session.start(scope: scope)
+        try writeEvent(encode(.started(sampleRate: started.sampleRate, scope: started.scope)))
         try termination.wait()
         session.stop()
         session.drain()

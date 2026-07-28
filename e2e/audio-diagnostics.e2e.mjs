@@ -342,19 +342,39 @@ process.stdin.on('data', (chunk) => {
     }) + '\\n');
     process.exit(0);
   }
-  const expected = {
-    command: 'capture',
-    protocolVersion: 1,
-    scope: { kind: 'diagnostic-global' },
-  };
-  if (JSON.stringify(message) !== JSON.stringify(expected)) process.exit(2);
+  if (
+    message.command !== 'capture' ||
+    message.protocolVersion !== 1 ||
+    message.scope?.kind !== 'application' ||
+    !Number.isSafeInteger(message.scope.inventoryGeneration) ||
+    message.scope.inventoryGeneration <= 0 ||
+    message.scope.responsiblePid !== 2000 ||
+    message.scope.bundleIdentifier !== 'us.zoom.xos' ||
+    message.scope.browserWideAcknowledged !== false ||
+    Object.keys(message).sort().join(',') !== 'command,protocolVersion,scope' ||
+    Object.keys(message.scope).sort().join(',') !==
+      'browserWideAcknowledged,bundleIdentifier,inventoryGeneration,kind,responsiblePid'
+  ) process.exit(2);
   started = true;
   appendFileSync(logPath, \`start:\${process.ppid}:\${process.pid}\\n\`);
   if (mode === 'initialization-failed') {
     process.stderr.write('{"event":"error","message":"fixture failure"}\\n');
     process.exit(1);
   }
-  process.stderr.write('{"channels":1,"event":"started","format":"float32le","sampleRate":48000,"scope":{"kind":"diagnostic-global","verified":false}}\\n');
+  process.stderr.write(JSON.stringify({
+    channels: 1,
+    event: 'started',
+    format: 'float32le',
+    sampleRate: 48000,
+    scope: {
+      kind: 'application',
+      verified: true,
+      inventoryGeneration: message.scope.inventoryGeneration,
+      responsiblePid: 2000,
+      bundleIdentifier: 'us.zoom.xos',
+      displayName: 'zoom.us',
+    },
+  }) + '\\n');
   timer = setInterval(() => process.stdout.write(frame), 5);
   const ownerPID = process.ppid;
   parentMonitor = setInterval(() => {
@@ -427,6 +447,15 @@ async function launchCue(microphoneMode, fixtureOptions = {}) {
   await page.reload();
   await page.locator('#more-btn').click();
   await page.locator('#audio-input').waitFor();
+  if (fixtureOptions.selectApplication !== false) {
+    const application = page.locator('#capture-application');
+    await application.locator('option', { hasText: 'zoom.us' }).waitFor({ state: 'attached' });
+    await application.selectOption({ label: 'zoom.us' });
+    await page
+      .locator('#capture-application-status')
+      .filter({ hasText: 'Requested: zoom.us.' })
+      .waitFor();
+  }
 
   return {
     electronApp,
@@ -578,6 +607,34 @@ test('E2E-CAPTURE-SCOPE-001 / E2E-BROWSER-SCOPE-DISCLOSURE-001 requires explicit
   }
 });
 
+test('E2E-CAPTURE-SCOPE-REQUIRED-001 fails closed before microphone or helper start', async () => {
+  const fixture = await launchCue('healthy', { selectApplication: false });
+  try {
+    await fixture.page.locator('#s-close').click();
+    await fixture.page.locator('#stop-btn').click();
+    await fixture.page
+      .locator('#capture-health')
+      .filter({
+        hasText:
+          'System audio unavailable: application-selection-required. Microphone remains active; remote participants are not being captured.',
+      })
+      .waitFor();
+
+    assert.equal(
+      await fixture.page
+        .locator('#stop-btn')
+        .evaluate((button) => button.classList.contains('active')),
+      false,
+    );
+    const state = await fixture.page.evaluate(() => window.__cueE2eAudio);
+    assert.equal(state.microphoneOpenCount, 0);
+    assert.deepEqual(await fixture.helperEvents(), []);
+    assert.deepEqual(fixture.networkRequests, []);
+  } finally {
+    await fixture.close();
+  }
+});
+
 test(
   'E2E-CAPTURE-UI-001 starts one native system helper and releases both channels',
   { timeout: 10_000 },
@@ -592,6 +649,11 @@ test(
           window.__cueE2eAudio.createdContextCount === 1,
       );
       await waitForHelperEventCount(fixture, 1);
+      await fixture.page.waitForFunction(() =>
+        document
+          .querySelector('#capture-application-status')
+          ?.textContent.includes('Effective: verified zoom.us.'),
+      );
 
       await fixture.page.locator('#stop-btn').click();
       await fixture.page.waitForFunction(
@@ -758,7 +820,7 @@ test(
       await fixture.page.locator('#stop-btn').click();
       await fixture.page.waitForFunction(() => window.__cueE2eAudio.pendingMediaRequestCount === 1);
       await fixture.page.waitForFunction(
-        () => document.documentElement.dataset.systemCaptureStatus === 'diagnostic',
+        () => document.documentElement.dataset.systemCaptureStatus === 'active',
       );
       await fixture.page.evaluate(() => window.__cueE2eAudio.resolvePendingMediaRequests());
       await fixture.page.waitForFunction(
@@ -776,7 +838,7 @@ test(
       await fixture.page.locator('#stop-btn').click();
       await fixture.page.waitForFunction(() => window.__cueE2eAudio.pendingMediaRequestCount === 1);
       await fixture.page.waitForFunction(
-        () => document.documentElement.dataset.systemCaptureStatus === 'diagnostic',
+        () => document.documentElement.dataset.systemCaptureStatus === 'active',
       );
       await fixture.page.evaluate(() => window.__cueE2eAudio.resolvePendingMediaRequests());
       await fixture.page.waitForFunction(
@@ -832,7 +894,7 @@ test(
               button.classList.contains('active') &&
               window.__cueE2eAudio.createdContextCount === cycle &&
               window.__cueE2eAudio.activeWorkletCount === 1 &&
-              document.documentElement.dataset.systemCaptureStatus === 'diagnostic',
+              document.documentElement.dataset.systemCaptureStatus === 'active',
           );
           button.click();
           await waitUntil(

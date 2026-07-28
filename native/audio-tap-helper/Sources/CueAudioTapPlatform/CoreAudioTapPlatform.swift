@@ -22,6 +22,7 @@ struct AggregateDevicePlan: Equatable {
 
 protocol CoreAudioCalls: AnyObject {
   func createTap() -> CoreAudioResult<UInt32>
+  func createApplicationTap(processObjectIDs: [UInt32]) -> CoreAudioResult<UInt32>
   func tapUID(for tapID: UInt32) -> CoreAudioResult<String>
   func tapFormat(for tapID: UInt32) -> CoreAudioResult<TapFormat>
   func processIDs() -> CoreAudioResult<[UInt32]>
@@ -93,6 +94,25 @@ public final class CoreAudioTapPlatform: AudioTapPlatform {
 
   public func createTap() throws -> UInt32 {
     try require(calls.createTap(), operation: "AudioHardwareCreateProcessTap")
+  }
+
+  public func createApplicationTap(processObjectIDs: [UInt32]) throws -> UInt32 {
+    guard !processObjectIDs.isEmpty else {
+      throw HelperError.missingAudioProcess
+    }
+    return try require(
+      calls.createApplicationTap(processObjectIDs: processObjectIDs),
+      operation: "AudioHardwareCreateProcessTap(application)"
+    )
+  }
+
+  public func verifyApplicationScope(
+    _ selection: ApplicationScopeSelection
+  ) throws -> VerifiedApplicationScope {
+    try resolver.resolve(
+      selection,
+      in: applicationCaptureInventory(generation: selection.inventoryGeneration)
+    )
   }
 
   public func tapUID(for tapID: UInt32) throws -> String {

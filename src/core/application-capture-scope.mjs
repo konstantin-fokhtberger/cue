@@ -36,6 +36,7 @@ export class ApplicationCaptureScopeCoordinator {
   #inventory = null;
   #inventoryClient;
   #isCaptureActive;
+  #requestedScope = null;
   #refreshing = false;
 
   constructor({ inventoryClient, isCaptureActive = Boolean }) {
@@ -51,6 +52,7 @@ export class ApplicationCaptureScopeCoordinator {
     this.#refreshing = true;
     this.#generation += 1;
     this.#inventory = null;
+    this.#requestedScope = null;
     try {
       const inventory = await this.#inventoryClient.refresh(this.#generation);
       this.#requireCaptureIdle();
@@ -67,12 +69,22 @@ export class ApplicationCaptureScopeCoordinator {
       throw new ApplicationCaptureScopeError('application-inventory-required');
     }
     const requestedScope = requestApplicationScope(this.#inventory, selection);
+    this.#requestedScope = requestedScope;
     return requestedScope;
+  }
+
+  captureConfiguration() {
+    this.#requireCaptureIdle();
+    if (!this.#requestedScope) {
+      throw new ApplicationCaptureScopeError('application-selection-required');
+    }
+    return { scope: { ...this.#requestedScope } };
   }
 
   #requireCaptureIdle() {
     if (this.#isCaptureActive()) {
       this.#inventory = null;
+      this.#requestedScope = null;
       throw new ApplicationCaptureScopeError('capture-active');
     }
   }

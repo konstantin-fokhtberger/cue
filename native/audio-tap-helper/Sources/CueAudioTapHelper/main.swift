@@ -4,6 +4,7 @@ import Darwin
 import Foundation
 
 private let ownerPID = getppid()
+private var activeScopeIsValid: () -> Bool = { true }
 
 private func readControlChunk() -> Data {
   while ownerPID > 1 && getppid() == ownerPID {
@@ -15,6 +16,9 @@ private func readControlChunk() -> Data {
     let result = Darwin.poll(&descriptor, 1, 100)
     if result > 0 {
       return FileHandle.standardInput.availableData
+    }
+    if result == 0 && !activeScopeIsValid() {
+      return Data([0])
     }
     if result < 0 && errno != EINTR {
       return Data()
@@ -37,6 +41,15 @@ private let session = AudioTapSession(
   writer: writer,
   drainWrites: { writerQueue.sync {} }
 )
+private var nextScopeValidationUptime: UInt64 = 0
+activeScopeIsValid = {
+  let now = DispatchTime.now().uptimeNanoseconds
+  guard now >= nextScopeValidationUptime else {
+    return true
+  }
+  nextScopeValidationUptime = now &+ 1_000_000_000
+  return session.scopeIsValid()
+}
 private let runner = HelperRunner(
   session: session,
   termination: control,

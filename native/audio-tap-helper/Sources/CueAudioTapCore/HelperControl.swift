@@ -7,13 +7,7 @@ public enum HelperCommand: String, Equatable {
 
 public enum CaptureScope: Equatable {
   case diagnosticGlobal
-
-  public var kind: String {
-    switch self {
-    case .diagnosticGlobal:
-      return "diagnostic-global"
-    }
-  }
+  case application(ApplicationScopeSelection)
 }
 
 public enum HelperConfiguration: Equatable {
@@ -40,13 +34,46 @@ public struct HelperControlDecoder {
       guard
         Set(object.keys) == ["command", "protocolVersion", "scope"],
         let scope = object["scope"] as? [String: Any],
-        Set(scope.keys) == ["kind"],
-        let scopeKind = scope["kind"] as? String,
-        scopeKind == "diagnostic-global"
+        let scopeKind = scope["kind"] as? String
       else {
         throw HelperError.invalidControlMessage
       }
-      return .capture(protocolVersion: version, scope: .diagnosticGlobal)
+      if Set(scope.keys) == ["kind"], scopeKind == "diagnostic-global" {
+        return .capture(protocolVersion: version, scope: .diagnosticGlobal)
+      }
+      guard
+        Set(scope.keys) == [
+          "browserWideAcknowledged",
+          "bundleIdentifier",
+          "inventoryGeneration",
+          "kind",
+          "responsiblePid",
+        ],
+        scopeKind == "application",
+        let generation = scope["inventoryGeneration"] as? Int,
+        generation > 0,
+        generation <= 9_007_199_254_740_991,
+        let responsiblePID = scope["responsiblePid"] as? Int,
+        responsiblePID > 0,
+        responsiblePID <= Int(Int32.max),
+        let bundleIdentifier = scope["bundleIdentifier"] as? String,
+        !bundleIdentifier.isEmpty,
+        bundleIdentifier == bundleIdentifier.trimmingCharacters(in: .whitespacesAndNewlines),
+        let browserWideAcknowledged = scope["browserWideAcknowledged"] as? Bool
+      else {
+        throw HelperError.invalidControlMessage
+      }
+      return .capture(
+        protocolVersion: version,
+        scope: .application(
+          ApplicationScopeSelection(
+            inventoryGeneration: UInt64(generation),
+            responsiblePID: Int32(responsiblePID),
+            bundleIdentifier: bundleIdentifier,
+            browserWideAcknowledged: browserWideAcknowledged
+          )
+        )
+      )
     case .inventory:
       guard
         Set(object.keys) == ["command", "generation", "protocolVersion"],

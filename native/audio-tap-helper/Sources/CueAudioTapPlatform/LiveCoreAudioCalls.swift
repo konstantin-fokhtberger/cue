@@ -19,6 +19,21 @@ final class LiveCoreAudioCalls: CoreAudioCalls {
     return result(status, value: tapID)
   }
 
+  func createApplicationTap(processObjectIDs: [UInt32]) -> CoreAudioResult<UInt32> {
+    let description = CATapDescription(
+      monoMixdownOfProcesses: processObjectIDs
+    )
+    description.name = "cue application audio tap"
+    description.isPrivate = true
+    description.muteBehavior = .unmuted
+    if #available(macOS 26.0, *) {
+      description.isProcessRestoreEnabled = false
+    }
+    var tapID = AudioObjectID(kAudioObjectUnknown)
+    let status = AudioHardwareCreateProcessTap(description, &tapID)
+    return result(status, value: tapID)
+  }
+
   func tapUID(for tapID: UInt32) -> CoreAudioResult<String> {
     var address = propertyAddress(kAudioTapPropertyUID)
     var size = UInt32(MemoryLayout<CFString>.stride)

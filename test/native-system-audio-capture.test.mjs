@@ -65,6 +65,33 @@ function diagnosticResource(inputSampleRate) {
   };
 }
 
+function applicationConfiguration() {
+  return {
+    scope: {
+      kind: 'application',
+      verified: false,
+      inventoryGeneration: 7,
+      responsiblePid: 2_000,
+      bundleIdentifier: 'com.google.Chrome',
+      displayName: 'Google Chrome',
+      browserWideAcknowledged: true,
+      requiresBrowserWideAcknowledgement: true,
+    },
+  };
+}
+
+function effectiveApplicationScope(overrides = {}) {
+  return {
+    kind: 'application',
+    verified: true,
+    inventoryGeneration: 7,
+    responsiblePid: 2_000,
+    bundleIdentifier: 'com.google.Chrome',
+    displayName: 'Google Chrome',
+    ...overrides,
+  };
+}
+
 describe('NativeSystemAudioCapture', () => {
   it('supports the production spawn default without starting a process', () => {
     expect(
@@ -122,6 +149,48 @@ describe('NativeSystemAudioCapture', () => {
     await expect(second).resolves.toBe(resource);
     await expect(startDiagnostic(harness.capture)).resolves.toBe(resource);
     expect(harness.spawn).toHaveBeenCalledTimes(1);
+  });
+
+  it('accepts only a verified effective application scope matching the requested instance', async () => {
+    const harness = createHarness();
+    const started = harness.capture.start(applicationConfiguration());
+    const child = harness.children[0];
+    child.stderr.write(startEvent(48_000, effectiveApplicationScope()));
+
+    await expect(started).resolves.toEqual({
+      inputSampleRate: 48_000,
+      scope: effectiveApplicationScope(),
+    });
+    expect(child.stdin.read()).toEqual(
+      Buffer.from(
+        '{"command":"capture","protocolVersion":1,"scope":{"kind":"application","inventoryGeneration":7,"responsiblePid":2000,"bundleIdentifier":"com.google.Chrome","browserWideAcknowledged":true}}\n',
+      ),
+    );
+    expect(harness.onState).toHaveBeenLastCalledWith({
+      status: 'active',
+      inputSampleRate: 48_000,
+      scope: effectiveApplicationScope(),
+    });
+  });
+
+  it.each([
+    effectiveApplicationScope({ verified: false }),
+    effectiveApplicationScope({ inventoryGeneration: 8 }),
+    effectiveApplicationScope({ responsiblePid: 2_001 }),
+    effectiveApplicationScope({ bundleIdentifier: 'us.zoom.xos' }),
+    effectiveApplicationScope({ displayName: 'Impostor' }),
+    { ...effectiveApplicationScope(), extra: true },
+    { ...effectiveApplicationScope(), kind: 'other' },
+    { kind: 'diagnostic-global', verified: false },
+  ])('rejects mismatched or unverified application metadata %j', async (scope) => {
+    const harness = createHarness();
+    const started = harness.capture.start(applicationConfiguration());
+    harness.children[0].stderr.write(startEvent(48_000, scope));
+
+    await expect(started).rejects.toEqual(
+      new NativeSystemAudioCaptureError('invalid-helper-scope'),
+    );
+    expect(harness.children[0].kill).toHaveBeenCalledWith('SIGTERM');
   });
 
   it('rejects absent or unsupported scope before spawning a helper', async () => {
@@ -195,6 +264,7 @@ describe('NativeSystemAudioCapture', () => {
   it.each([
     null,
     { kind: 'application', verified: false },
+    effectiveApplicationScope(),
     { kind: 'diagnostic-global', verified: true },
     { kind: 'diagnostic-global', verified: false, extra: true },
   ])('rejects invalid effective scope metadata %j independently', async (scope) => {

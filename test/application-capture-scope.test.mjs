@@ -341,6 +341,18 @@ describe('ApplicationCaptureScopeCoordinator', () => {
       inventoryGeneration: 2,
       responsiblePid: 2_000,
     });
+    expect(coordinator.captureConfiguration()).toMatchObject({
+      scope: {
+        kind: 'application',
+        verified: false,
+        inventoryGeneration: 2,
+        responsiblePid: 2_000,
+      },
+    });
+    await coordinator.refresh();
+    expect(() => coordinator.captureConfiguration()).toThrow(
+      new ApplicationCaptureScopeError('application-selection-required'),
+    );
   });
 
   it('rejects a concurrent refresh without corrupting the in-flight generation', async () => {

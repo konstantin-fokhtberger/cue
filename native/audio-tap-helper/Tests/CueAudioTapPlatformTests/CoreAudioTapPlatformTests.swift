@@ -35,6 +35,13 @@ private final class FakeCoreAudioCalls: CoreAudioCalls {
     return createTapResult
   }
 
+  func createApplicationTap(processObjectIDs: [UInt32]) -> CoreAudioResult<UInt32> {
+    operations.append(
+      "createApplicationTap:\(processObjectIDs.map(String.init).joined(separator: ","))"
+    )
+    return createTapResult
+  }
+
   func tapUID(for tapID: UInt32) -> CoreAudioResult<String> {
     operations.append("tapUID:\(tapID)")
     return tapUIDResult
@@ -162,6 +169,76 @@ final class CoreAudioTapPlatformTests: XCTestCase {
         .operation(name: "AudioObjectGetPropertyData(tap format)", status: -52)
       )
     }
+  }
+
+  func testApplicationTapRequiresAnExactNonemptyInclusionSetAndMapsFailures() throws {
+    let calls = FakeCoreAudioCalls()
+    let platform = CoreAudioTapPlatform(calls: calls, identifier: "fixed-id")
+
+    XCTAssertEqual(try platform.createApplicationTap(processObjectIDs: [101, 102]), 11)
+    XCTAssertEqual(calls.operations, ["createApplicationTap:101,102"])
+
+    XCTAssertThrowsError(try platform.createApplicationTap(processObjectIDs: [])) {
+      XCTAssertEqual($0 as? HelperError, .missingAudioProcess)
+    }
+    XCTAssertEqual(calls.operations, ["createApplicationTap:101,102"])
+
+    calls.createTapResult = .failure(-53)
+    XCTAssertThrowsError(try platform.createApplicationTap(processObjectIDs: [101])) {
+      XCTAssertEqual(
+        $0 as? HelperError,
+        .operation(name: "AudioHardwareCreateProcessTap(application)", status: -53)
+      )
+    }
+  }
+
+  func testApplicationVerificationUsesAFreshInventoryForTheRequestedGeneration() throws {
+    let calls = FakeCoreAudioCalls()
+    calls.processIDsResult = .success([101])
+    calls.runningResults = [101: .success(1)]
+    calls.processPIDResults = [101: .success(2_001)]
+    calls.processBundleIDResults = [101: .success("us.zoom.xos.helper")]
+    calls.deviceResults = [101: .success([31])]
+    calls.deviceUIDResults = [31: .success("sony")]
+    let metadata = FakeProcessMetadataCalls()
+    metadata.nodes = [
+      2_001: ProcessNode(pid: 2_001, parentPID: 2_000),
+      2_000: ProcessNode(
+        pid: 2_000,
+        parentPID: 1,
+        bundleIdentifier: "us.zoom.xos",
+        displayName: "zoom.us",
+        isRegularApplication: true
+      ),
+    ]
+    let platform = CoreAudioTapPlatform(
+      calls: calls,
+      processMetadata: metadata,
+      resolver: CaptureScopeResolver(),
+      identifier: "fixed-id"
+    )
+
+    XCTAssertEqual(
+      try platform.verifyApplicationScope(
+        ApplicationScopeSelection(
+          inventoryGeneration: 42,
+          responsiblePID: 2_000,
+          bundleIdentifier: "us.zoom.xos",
+          browserWideAcknowledged: false
+        )
+      ),
+      VerifiedApplicationScope(
+        inventoryGeneration: 42,
+        identity: ResponsibleApplicationIdentity(
+          pid: 2_000,
+          bundleIdentifier: "us.zoom.xos",
+          displayName: "zoom.us"
+        ),
+        audioProcessObjectIDs: [101],
+        outputDeviceUIDs: ["sony"]
+      )
+    )
+    XCTAssertEqual(calls.operations.first, "processIDs")
   }
 
   func testRunningDevicesFilterProcessesUnknownIDsEmptyUIDsAndDuplicates() throws {
