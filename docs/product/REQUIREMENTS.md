@@ -57,6 +57,13 @@
 | FR-MEET-004 |       P1 | accepted | Rename speaker labels                      | Renaming updates presentation without rewriting raw transcript evidence                     |
 | FR-MEET-005 |       P1 | accepted | Show what data is being attached           | Before dispatch, the UI identifies transcript, screen, and professional context attachments |
 
+### macOS application shell
+
+| ID           | Priority | Status   | Requirement                                                      | Acceptance criteria                                                                                                                                              |
+| ------------ | -------: | -------- | ---------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| FR-SHELL-001 |       P1 | accepted | The user can reposition the overlay by dragging its upper area   | A dedicated non-interactive drag region moves the frameless window within one display and between connected displays without intercepting adjacent controls      |
+| FR-SHELL-002 |       P1 | accepted | The app exposes a macOS menu bar status item with an exit action | While cue is running, its status item is visible; selecting `Close app` performs graceful application shutdown and releases active capture resources and helpers |
+
 ### Interview and coding profiles
 
 | ID          | Priority | Status   | Requirement                                               | Acceptance criteria                                                              |
@@ -68,13 +75,14 @@
 
 ### Privacy and provider control
 
-| ID          | Priority | Status   | Requirement                                 | Acceptance criteria                                                                         |
-| ----------- | -------: | -------- | ------------------------------------------- | ------------------------------------------------------------------------------------------- |
-| FR-PRIV-001 |       P0 | accepted | Store API keys in macOS Keychain            | No provider secret appears in application JSON, logs, fixtures, or renderer state           |
-| FR-PRIV-002 |       P0 | accepted | Display active capture and provider state   | The user can always determine whether capture is active and where data is sent              |
-| FR-PRIV-003 |       P0 | accepted | Apply explicit retention policy per session | Raw audio is never persisted and transcript exists only in active-session memory            |
-| FR-PRIV-004 |       P1 | accepted | Clear session data on request               | Clear operation removes all locally retained artifacts and reports completion               |
-| FR-PRIV-005 |       P1 | accepted | Sanitize provider errors                    | Error UI and logs contain no keys, raw requests, audio, transcript, or professional context |
+| ID          | Priority | Status   | Requirement                                             | Acceptance criteria                                                                                                      |
+| ----------- | -------: | -------- | ------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------ |
+| FR-PRIV-001 |       P0 | accepted | Store API keys in macOS Keychain                        | No provider secret appears in application JSON, logs, fixtures, or renderer state                                        |
+| FR-PRIV-002 |       P0 | accepted | Display active capture and provider state               | The user can always determine whether capture is active and where data is sent                                           |
+| FR-PRIV-003 |       P0 | accepted | Apply explicit retention policy per session             | Raw audio is never persisted and transcript exists only in active-session memory                                         |
+| FR-PRIV-004 |       P1 | accepted | Clear session data on request                           | Clear operation removes all locally retained artifacts and reports completion                                            |
+| FR-PRIV-005 |       P1 | accepted | Sanitize provider errors                                | Error UI and logs contain no keys, raw requests, audio, transcript, or professional context                              |
+| FR-PRIV-006 |       P0 | accepted | Request capture permissions only for the active feature | Meeting audio never requests screen capture; screen permission is requested only after explicit screen/coding invocation |
 
 ## 3. Non-functional requirements
 

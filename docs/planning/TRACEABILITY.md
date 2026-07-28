@@ -17,9 +17,9 @@
 | FR-SESSION-005 | ARCH-TIMELINE-001                                | AT-SESSION-BOUNDARY-001, MT-TIMELINE-001                                | planned  |
 | FR-SESSION-006 | TEST-AUDIO-002                                   | RT-MAC-RECOVERY-001                                                     | planned  |
 | FR-AUDIO-001   | SPIKE-AUDIO-001, TEST-AUDIO-001, AUDIO-DIAG-001  | CT-CAPTURE-MIC-001, CT-AUDIO-DIAG-001, RT-MAC-HYPERX-DIAG-001           | planned  |
-| FR-AUDIO-002   | SPIKE-AUDIO-001, TEST-AUDIO-002                  | CT-CAPTURE-SYSTEM-001, RT-MAC-APPS-001                                  | planned  |
+| FR-AUDIO-002   | SPIKE-AUDIO-001, BUG-AUDIO-002, TEST-AUDIO-002   | UT-DISPLAY-MEDIA-POLICY-001, E2E-SYSTEM-DEGRADED-001, RT-MAC-APPS-001   | planned  |
 | FR-AUDIO-003   | SPIKE-AUDIO-001                                  | RT-MAC-SELF-AUDIO-001                                                   | planned  |
-| FR-AUDIO-004   | SPIKE-AUDIO-001, AUDIO-DIAG-001                  | UT-CAPTURE-HEALTH-001, UT-AUDIO-DIAG-STATE-001, RT-MAC-DEAD-001         | planned  |
+| FR-AUDIO-004   | SPIKE-AUDIO-001, BUG-AUDIO-002, AUDIO-DIAG-001   | UT-CAPTURE-HEALTH-001, E2E-SYSTEM-DEGRADED-001, RT-MAC-DEAD-001         | planned  |
 | FR-AUDIO-005   | TEST-AUDIO-001                                   | PT-AUDIO-BOUNDS-001, MT-AUDIO-001                                       | planned  |
 | FR-AUDIO-006   | TEST-AUDIO-002                                   | RT-MAC-ROUTES-001                                                       | planned  |
 | FR-AUDIO-007   | SPIKE-AUDIO-001, TEST-AUDIO-002                  | RT-MAC-USB-BT-001, RT-MAC-APPS-USB-BT-001                               | planned  |
@@ -37,6 +37,8 @@
 | FR-MEET-003    | MEET-004                                         | E2E-MEET-RECAP-001, EVAL-RECAP-001                                      | planned  |
 | FR-MEET-004    | MEET-005                                         | E2E-SPEAKER-RENAME-001                                                  | planned  |
 | FR-MEET-005    | MEET-001                                         | E2E-ATTACHMENTS-001                                                     | planned  |
+| FR-SHELL-001   | UI-WINDOW-001                                    | CT-WINDOW-DRAG-REGION-001, RT-MAC-MULTIDISPLAY-DRAG-001                 | planned  |
+| FR-SHELL-002   | UI-MENUBAR-001                                   | CT-MENUBAR-CLOSE-001, E2E-MENUBAR-SHUTDOWN-001, RT-MAC-MENUBAR-001      | planned  |
 | FR-INT-001     | INT-001                                          | E2E-INTERVIEW-PROFILE-001                                               | planned  |
 | FR-INT-002     | INT-001                                          | AT-CONTEXT-BOUNDARY-001                                                 | planned  |
 | FR-CODE-001    | CODE-001                                         | E2E-SCREEN-EXPLICIT-001                                                 | planned  |
@@ -46,6 +48,7 @@
 | FR-PRIV-003    | DEC-004, ARCH-TIMELINE-001                       | AT-RETENTION-001, MT-RETENTION-001                                      | planned  |
 | FR-PRIV-004    | ARCH-TIMELINE-001                                | AT-CLEAR-001                                                            | planned  |
 | FR-PRIV-005    | SEC-IPC-001                                      | PT-ERROR-REDACTION-001, MT-REDACTION-001                                | planned  |
+| FR-PRIV-006    | BUG-AUDIO-003                                    | UT-DISPLAY-MEDIA-POLICY-002, RT-MAC-MEET-NO-SCREEN-TCC-001              | planned  |
 | NFR-REL-001    | ARCH-SESSION-001, TEST-AUDIO-002                 | STRESS-SESSION-100-001                                                  | planned  |
 | NFR-REL-002    | ARCH-SESSION-001                                 | FUZZ-SESSION-EVENTS-001                                                 | planned  |
 | NFR-TEST-001   | TOOL-001, CI-001                                 | CI-COVERAGE-001                                                         | planned  |
@@ -58,27 +61,27 @@
 | NFR-PERF-002   | STT-001                                          | PERF-STT-001                                                            | planned  |
 | NFR-PERF-003   | MEET-002                                         | PERF-SUGGESTION-001                                                     | planned  |
 | NFR-RES-001    | REL-001                                          | SOAK-4H-001                                                             | planned  |
-| NFR-OBS-001    | REL-001                                          | AT-DIAGNOSTICS-001, SCAN-LOGS-001                                       | planned  |
-| NFR-COMP-001   | TEST-AUDIO-002                                   | ENV-TARGET-MAC-001                                                      | planned  |
+| NFR-OBS-001    | BUG-AUDIO-002, REL-001                           | E2E-SYSTEM-FAIL-SINGLE-001, AT-DIAGNOSTICS-001, SCAN-LOGS-001           | planned  |
+| NFR-COMP-001   | BUG-AUDIO-002, TEST-AUDIO-002                    | UT-DISPLAY-MEDIA-POLICY-001, ENV-TARGET-MAC-001                         | planned  |
 
 ## Implemented quality controls
 
-| Requirement    | Change                           | Executable evidence                                                          | Status                                                                                                                 |
-| -------------- | -------------------------------- | ---------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------- |
-| NFR-TEST-001   | TOOL-001, CI-001                 | `npm run test:coverage`, CI-COVERAGE-001                                     | verified in GitHub Actions for the enforced scope                                                                      |
-| NFR-TEST-002   | TOOL-001, CI-001                 | `npm run test:mutation`, CI-MUTATION-001                                     | verified in GitHub Actions for enforced modules                                                                        |
-| NFR-TEST-003   | CI-001                           | `npm run validate:traceability`, CI-TRACEABILITY-001                         | structural matrix validation implemented; requirement-wide executable evidence remains incremental                     |
-| FR-AUDIO-004   | SPIKE-AUDIO-001, AUDIO-DIAG-001  | UT-CAPTURE-HEALTH-001, UT-AUDIO-DIAG-STATE-001                               | PCM health and diagnostic deadline classification verified; platform dead-stream evidence remains open                 |
-| FR-AUDIO-001   | TEST-AUDIO-001, AUDIO-DIAG-001   | CT-AUDIO-DIAG-001, RT-MAC-HYPERX-DIAG-001                                    | provider-free exact HyperX PCM and bounded lifecycle verified; main meeting IPC boundary remains open                  |
-| FR-AUDIO-002   | SPIKE-AUDIO-001                  | RT-MAC-MEET-001                                                              | Google Meet с четырьмя участниками дал здоровый system PCM; Zoom, Teams и transcript evidence остаются открытыми       |
-| FR-AUDIO-005   | TEST-AUDIO-001                   | PT-AUDIO-BOUNDS-001, MT-AUDIO-001                                            | 60-second per-channel bound matches the newest-byte model across 500 generated sequences                               |
-| FR-AUDIO-007   | SPIKE-AUDIO-001                  | RT-MAC-USB-BT-001                                                            | cue открыл HyperX SoloCast при системном Sony Bluetooth output; выбор устройств внутри Google Meet не был зафиксирован |
-| FR-AUDIO-008   | AUDIO-DEVICE-001, AUDIO-DIAG-001 | E2E-AUDIO-DIAG-001, E2E-AUDIO-DIAG-DENY-001, RT-MAC-HYPERX-RESTART-001       | packaged exact input, healthy and denied PCM paths, persistence and controlled restart passed                          |
-| FR-AUDIO-009   | AUDIO-DEVICE-001, AUDIO-DIAG-001 | E2E-AUDIO-DIAG-001, CT-AUDIO-DIAG-SINK-001, RT-MAC-SONY-OUT-001              | packaged exact Sony fixture, bounded tone graph and human audible confirmation passed                                  |
-| FR-SESSION-002 | BUG-AUDIO-001, TEST-AUDIO-001    | CT-CAPTURE-DOUBLE-START-001, E2E-CAPTURE-UI-001                              | duplicate Start coalescing verified at adapter and real renderer boundaries                                            |
-| FR-SESSION-003 | BUG-AUDIO-001, TEST-AUDIO-001    | CT-CAPTURE-STOP-001, STRESS-CAPTURE-100-001, RT-MAC-STOP-001                 | 100 renderer cycles close every graph and emit no post-Stop PCM; target-Mac Stop evidence remains green                |
-| FR-SESSION-004 | BUG-AUDIO-001, TEST-AUDIO-001    | PT-CAPTURE-SEQUENCE-001, CT-CAPTURE-STOP-RACE-001, E2E-CAPTURE-STOP-RACE-001 | generated and renderer late-media races dispose obsolete resources and cannot reactivate capture                       |
-| NFR-SEC-003    | BUG-PKG-001                      | UT-MAC-SIGNING-POLICY-001, PKG-TCC-IDENTITY-001                              | two consecutive local packages retained identical bundle/team identity and designated-requirement fingerprint          |
+| Requirement    | Change                                         | Executable evidence                                                                   | Status                                                                                                                 |
+| -------------- | ---------------------------------------------- | ------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------- |
+| NFR-TEST-001   | TOOL-001, CI-001                               | `npm run test:coverage`, CI-COVERAGE-001                                              | verified in GitHub Actions for the enforced scope                                                                      |
+| NFR-TEST-002   | TOOL-001, CI-001                               | `npm run test:mutation`, CI-MUTATION-001                                              | verified in GitHub Actions for enforced modules                                                                        |
+| NFR-TEST-003   | CI-001                                         | `npm run validate:traceability`, CI-TRACEABILITY-001                                  | structural matrix validation implemented; requirement-wide executable evidence remains incremental                     |
+| FR-AUDIO-004   | SPIKE-AUDIO-001, BUG-AUDIO-002, AUDIO-DIAG-001 | UT-CAPTURE-HEALTH-001, E2E-SYSTEM-DEGRADED-001, E2E-SYSTEM-FAIL-SINGLE-001            | System failure is persistent, channel-specific, and emitted once; real TCC recovery evidence remains open              |
+| FR-AUDIO-001   | TEST-AUDIO-001, AUDIO-DIAG-001                 | CT-AUDIO-DIAG-001, RT-MAC-HYPERX-DIAG-001                                             | provider-free exact HyperX PCM and bounded lifecycle verified; main meeting IPC boundary remains open                  |
+| FR-AUDIO-002   | SPIKE-AUDIO-001, BUG-AUDIO-002                 | UT-NATIVE-SYSTEM-AUDIO-001, IT-PACKAGE-AUDIO-USAGE-001, RT-MAC-MEET-SYSTEM-SIGNAL-001 | Signed package captured nonzero Google Meet system PCM through the active Sony output route                            |
+| FR-AUDIO-005   | TEST-AUDIO-001                                 | PT-AUDIO-BOUNDS-001, MT-AUDIO-001                                                     | 60-second per-channel bound matches the newest-byte model across 500 generated sequences                               |
+| FR-AUDIO-007   | SPIKE-AUDIO-001                                | RT-MAC-USB-BT-001                                                                     | cue открыл HyperX SoloCast при системном Sony Bluetooth output; выбор устройств внутри Google Meet не был зафиксирован |
+| FR-AUDIO-008   | AUDIO-DEVICE-001, AUDIO-DIAG-001               | E2E-AUDIO-DIAG-001, E2E-AUDIO-DIAG-DENY-001, RT-MAC-HYPERX-RESTART-001                | packaged exact input, healthy and denied PCM paths, persistence and controlled restart passed                          |
+| FR-AUDIO-009   | AUDIO-DEVICE-001, AUDIO-DIAG-001               | E2E-AUDIO-DIAG-001, CT-AUDIO-DIAG-SINK-001, RT-MAC-SONY-OUT-001                       | packaged exact Sony fixture, bounded tone graph and human audible confirmation passed                                  |
+| FR-SESSION-002 | BUG-AUDIO-001, TEST-AUDIO-001                  | CT-CAPTURE-DOUBLE-START-001, E2E-CAPTURE-UI-001                                       | duplicate Start coalescing verified at adapter and real renderer boundaries                                            |
+| FR-SESSION-003 | BUG-AUDIO-001, TEST-AUDIO-001                  | CT-CAPTURE-STOP-001, STRESS-CAPTURE-100-001, RT-MAC-STOP-001                          | 100 renderer cycles close every graph and emit no post-Stop PCM; target-Mac Stop evidence remains green                |
+| FR-SESSION-004 | BUG-AUDIO-001, TEST-AUDIO-001                  | PT-CAPTURE-SEQUENCE-001, CT-CAPTURE-STOP-RACE-001, E2E-CAPTURE-STOP-RACE-001          | generated and renderer late-media races dispose obsolete resources and cannot reactivate capture                       |
+| NFR-SEC-003    | BUG-PKG-001                                    | UT-MAC-SIGNING-POLICY-001, PKG-TCC-IDENTITY-001                                       | two consecutive local packages retained identical bundle/team identity and designated-requirement fingerprint          |
 
 ## Test ID prefixes
 

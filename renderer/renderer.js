@@ -17,6 +17,7 @@ import {
   describeEffectiveInput,
   normalizeAudioDeviceId,
 } from '../src/core/audio-device-policy.mjs';
+import { systemCaptureFailureMessage } from '../src/core/system-capture-status.mjs';
 
 /* cue renderer — UI state, mic capture, IPC, streaming render. */
 (function () {
@@ -202,15 +203,9 @@ import {
     $('#live-dot').style.display = collapsed ? 'none' : '';
   });
 
-  // Stop = start/stop listening. Kick off system-audio capture straight from the click so
-  // the user-gesture is fresh for getDisplayMedia (loopback capture needs it).
-  $('#stop-btn').addEventListener('click', () => {
-    const turningOn = !$('#stop-btn').classList.contains('active');
-    if (turningOn) startSystemAudio();
-    cue.captureToggle();
-  });
+  $('#stop-btn').addEventListener('click', () => cue.captureToggle());
 
-  // ---- capture: microphone and system audio ------------------------------
+  // ---- capture: selected microphone --------------------------------------
   const browserAudioDependencies = {
     createAudioContext: () => new AudioContext({ sampleRate: 16000 }),
     createMediaStream: (tracks) => new MediaStream(tracks),
@@ -227,21 +222,6 @@ import {
     ),
     onStarted: () => cue.log('microphone audio: capturing'),
     onPcm: (pcm) => cue.micPcm(pcm),
-  });
-
-  const systemAudioCapture = new BrowserPcmCapture({
-    ...browserAudioDependencies,
-    channel: 'system',
-    openStream: async () => {
-      const stream = await navigator.mediaDevices.getDisplayMedia({ video: true, audio: true });
-      stream.getVideoTracks().forEach((track) => {
-        stream.removeTrack(track);
-        track.stop();
-      });
-      return stream;
-    },
-    onStarted: () => cue.log('system audio: capturing loopback'),
-    onPcm: (pcm) => cue.systemPcm(pcm),
   });
 
   const microphoneDiagnosticCapture = new BrowserPcmCapture({
@@ -292,15 +272,42 @@ import {
     return resource;
   }
   function stopMic() { stopCapture(microphoneCapture, 'microphone'); }
-  function startSystemAudio() { return startCapture(systemAudioCapture, 'system'); }
-  function stopSystemAudio() { stopCapture(systemAudioCapture, 'system'); }
+
+  function setSystemCaptureHealthy() {
+    $('#live-dot').classList.remove('degraded');
+    const health = $('#capture-health');
+    health.textContent = '';
+    health.classList.add('hidden');
+  }
+
+  function setSystemCaptureFailure(code) {
+    $('#live-dot').classList.add('degraded');
+    const message = systemCaptureFailureMessage(code);
+    const health = $('#capture-health');
+    health.textContent = message;
+    health.classList.remove('hidden');
+    cue.log('capture degraded: ' + message);
+  }
 
   // ---- events from main --------------------------------------------------
   cue.on('capture:state', ({ active }) => {
     captureActive = active;
     $('#live-dot').classList.toggle('off', !active);
     $('#stop-btn').classList.toggle('active', active);
-    if (active) { startMic(); startSystemAudio(); } else { stopMic(); stopSystemAudio(); }
+    if (active) {
+      startMic();
+    } else {
+      setSystemCaptureHealthy();
+      stopMic();
+    }
+  });
+  cue.on('system-capture:state', ({ status, code }) => {
+    document.documentElement.dataset.systemCaptureStatus = status;
+    if (status === 'active') {
+      setSystemCaptureHealthy();
+    } else if (status === 'error') {
+      setSystemCaptureFailure(code || 'initialization-failed');
+    }
   });
   cue.on('llm:start', ({ userBubble, small }) => {
     clearMessages();

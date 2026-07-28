@@ -10,7 +10,8 @@
     "npm": ">=10.0.0"
   },
   "scripts": {
-    "start": "electron .",
+    "build:native-audio": "node tools/build-audio-helper.mjs",
+    "start": "npm run build:native-audio && electron .",
     "test": "vitest run",
     "test:e2e": "node --test e2e/*.e2e.mjs",
     "test:e2e:packaged": "CUE_E2E_PACKAGED=1 node --test e2e/*.e2e.mjs",
@@ -25,8 +26,8 @@
     "quality": "npm run lint && npm run format:check && npm run typecheck && npm run validate:traceability && npm run test:coverage && npm run audit:production",
     "quality:full": "npm run quality && npm run test:mutation",
     "pack": "electron-builder --dir",
-    "pack:ci": "node tools/package-macos.mjs --adhoc",
-    "pack:local": "node tools/package-macos.mjs --local",
+    "pack:ci": "npm run build:native-audio && node tools/package-macos.mjs --adhoc",
+    "pack:local": "npm run build:native-audio && node tools/package-macos.mjs --local",
     "dist": "electron-builder --mac zip",
     "dist:win": "electron-builder --win"
   },
@@ -39,6 +40,12 @@
       "preload.js",
       "src/**/*",
       "renderer/**/*"
+    ],
+    "extraResources": [
+      {
+        "from": "build/native/cue-audio-tap-helper",
+        "to": "native/cue-audio-tap-helper"
+      }
     ],
     "mac": {
       "target": [

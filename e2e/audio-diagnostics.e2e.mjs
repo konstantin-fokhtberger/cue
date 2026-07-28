@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { mkdtemp, mkdir, rm, writeFile } from 'node:fs/promises';
+import { chmod, mkdtemp, mkdir, readFile, rm, writeFile } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
@@ -33,7 +33,6 @@ function audioFixtureScript({ captureMode, microphoneMode, workletFailures }) {
     microphoneMode,
     openedInputIds: [],
     microphoneOpenCount: 0,
-    systemOpenCount: 0,
     stoppedTrackCount: 0,
     trackStopCallCount: 0,
     createdContextCount: 0,
@@ -226,16 +225,6 @@ function audioFixtureScript({ captureMode, microphoneMode, workletFailures }) {
         () => new FixtureStream([new FixtureTrack('audio', requestedId, label)]),
       );
     },
-    async getDisplayMedia() {
-      state.systemOpenCount += 1;
-      return resolveMediaRequest(
-        () =>
-          new FixtureStream([
-            new FixtureTrack('audio', 'system', 'System audio (fixture)'),
-            new FixtureTrack('video', 'display', 'Display video (fixture)'),
-          ]),
-      );
-    },
   };
 
   Object.defineProperty(navigator, 'mediaDevices', {
@@ -279,6 +268,32 @@ function audioFixtureScript({ captureMode, microphoneMode, workletFailures }) {
   HTMLMediaElement.prototype.pause = function pause() {};
 }
 
+function systemAudioHelperFixtureScript() {
+  return `#!/usr/bin/env node
+import { appendFileSync } from 'node:fs';
+
+const logPath = process.env.CUE_E2E_AUDIO_HELPER_LOG;
+const mode = process.env.CUE_E2E_AUDIO_HELPER_MODE || 'healthy';
+appendFileSync(logPath, 'start\\n');
+if (mode === 'initialization-failed') {
+  process.stderr.write('{"event":"error","message":"fixture failure"}\\n');
+  process.exit(1);
+}
+const frame = Buffer.alloc(48 * 4);
+for (let index = 0; index < 48; index += 1) frame.writeFloatLE(index % 2 ? 0.25 : -0.25, index * 4);
+let timer;
+const stop = () => {
+  clearInterval(timer);
+  appendFileSync(logPath, 'stop\\n');
+  process.exit(0);
+};
+process.on('SIGTERM', stop);
+process.on('SIGINT', stop);
+process.stderr.write('{"channels":1,"event":"started","format":"float32le","sampleRate":48000}\\n');
+timer = setInterval(() => process.stdout.write(frame), 5);
+`;
+}
+
 async function launchCue(microphoneMode, fixtureOptions = {}) {
   const temporaryRoot = await mkdtemp(path.join(os.tmpdir(), 'cue-e2e-'));
   const userDataDir = path.join(temporaryRoot, 'user-data');
@@ -292,6 +307,11 @@ async function launchCue(microphoneMode, fixtureOptions = {}) {
       apiKeys: { openai: '', anthropic: '', gemini: '', nvidia: '' },
     }),
   );
+  const helperPath = path.join(temporaryRoot, 'fake-system-audio-helper.mjs');
+  const helperLogPath = path.join(temporaryRoot, 'system-audio-helper.log');
+  await writeFile(helperPath, systemAudioHelperFixtureScript());
+  await chmod(helperPath, 0o755);
+  await writeFile(helperLogPath, '');
 
   const packaged = process.env.CUE_E2E_PACKAGED === '1';
   let electronApp;
@@ -304,6 +324,9 @@ async function launchCue(microphoneMode, fixtureOptions = {}) {
         ...process.env,
         CUE_E2E: '1',
         CUE_E2E_USER_DATA_DIR: userDataDir,
+        CUE_E2E_AUDIO_HELPER_PATH: helperPath,
+        CUE_E2E_AUDIO_HELPER_LOG: helperLogPath,
+        CUE_E2E_AUDIO_HELPER_MODE: fixtureOptions.systemMode || 'healthy',
         CUE_NO_PROTECT: '1',
       },
     });
@@ -330,6 +353,10 @@ async function launchCue(microphoneMode, fixtureOptions = {}) {
     networkRequests,
     page,
     temporaryRoot,
+    async helperEvents() {
+      const content = await readFile(helperLogPath, 'utf8');
+      return content.trim().split('\n').filter(Boolean);
+    },
     async close() {
       try {
         await electronApp.close();
@@ -338,6 +365,16 @@ async function launchCue(microphoneMode, fixtureOptions = {}) {
       }
     },
   };
+}
+
+async function waitForHelperEventCount(fixture, expectedCount) {
+  const deadline = Date.now() + 2_000;
+  while ((await fixture.helperEvents()).length !== expectedCount) {
+    if (Date.now() >= deadline) {
+      throw new Error(`Timed out waiting for ${expectedCount} native-helper lifecycle events.`);
+    }
+    await new Promise((resolve) => setTimeout(resolve, 10));
+  }
 }
 
 test('E2E-AUDIO-DIAG-001 uses exact local routes without provider traffic', async () => {
@@ -400,7 +437,7 @@ test('E2E-AUDIO-DIAG-DENY-001 reports typed permission denial locally', async ()
 });
 
 test(
-  'E2E-CAPTURE-UI-001 coalesces renderer Start requests and releases both channels',
+  'E2E-CAPTURE-UI-001 starts one native system helper and releases both channels',
   { timeout: 10_000 },
   async () => {
     const fixture = await launchCue('healthy');
@@ -410,24 +447,73 @@ test(
       await fixture.page.waitForFunction(
         () =>
           window.__cueE2eAudio.microphoneOpenCount === 1 &&
-          window.__cueE2eAudio.systemOpenCount === 1 &&
-          window.__cueE2eAudio.createdContextCount === 2,
+          window.__cueE2eAudio.createdContextCount === 1,
       );
+      await waitForHelperEventCount(fixture, 1);
 
       await fixture.page.locator('#stop-btn').click();
       await fixture.page.waitForFunction(
         () =>
-          window.__cueE2eAudio.closedContextCount === 2 &&
-          window.__cueE2eAudio.stoppedTrackCount === 3,
+          window.__cueE2eAudio.closedContextCount === 1 &&
+          window.__cueE2eAudio.stoppedTrackCount === 1,
+      );
+      await fixture.page.waitForTimeout(50);
+
+      const state = await fixture.page.evaluate(() => window.__cueE2eAudio);
+      assert.equal(state.createdWorkletCount, 1);
+      assert.equal(state.disconnectedWorkletCount, 1);
+      assert.equal(state.workletDisconnectCallCount, 1);
+      assert.equal(state.contextCloseCallCount, 1);
+      assert.equal(state.trackStopCallCount, 1);
+      assert.equal(state.postStopPcmCount, 0);
+      assert.deepEqual(await fixture.helperEvents(), ['start', 'stop']);
+      assert.deepEqual(fixture.networkRequests, []);
+    } finally {
+      await fixture.close();
+    }
+  },
+);
+
+test(
+  'E2E-SYSTEM-DEGRADED-001 / E2E-SYSTEM-FAIL-SINGLE-001 reports one system failure while microphone remains active',
+  { timeout: 10_000 },
+  async () => {
+    const fixture = await launchCue('healthy', { systemMode: 'initialization-failed' });
+    try {
+      await fixture.page.locator('#s-close').click();
+      await fixture.page.locator('#stop-btn').click();
+      await fixture.page
+        .locator('#capture-health')
+        .filter({
+          hasText:
+            'System audio unavailable: helper-error. Microphone remains active; remote participants are not being captured.',
+        })
+        .waitFor({ timeout: 2_000 });
+      await fixture.page.waitForFunction(
+        () =>
+          window.__cueE2eAudio.microphoneOpenCount === 1 &&
+          window.__cueE2eAudio.activeWorkletCount === 1,
+        undefined,
+        { timeout: 2_000 },
       );
 
       const state = await fixture.page.evaluate(() => window.__cueE2eAudio);
-      assert.equal(state.createdWorkletCount, 2);
-      assert.equal(state.disconnectedWorkletCount, 2);
-      assert.equal(state.workletDisconnectCallCount, 2);
-      assert.equal(state.contextCloseCallCount, 2);
-      assert.equal(state.trackStopCallCount, 3);
-      assert.equal(state.postStopPcmCount, 0);
+      assert.equal(state.microphoneOpenCount, 1);
+      assert.equal(state.activeWorkletCount, 1);
+      assert.deepEqual(await fixture.helperEvents(), ['start']);
+      await assert.doesNotReject(() =>
+        fixture.page.locator('#live-dot.degraded').waitFor({ timeout: 2_000 }),
+      );
+
+      await fixture.page.locator('#stop-btn').click();
+      await fixture.page.locator('#capture-health').waitFor({ state: 'hidden', timeout: 2_000 });
+      await fixture.page.waitForFunction(
+        () =>
+          window.__cueE2eAudio.activeWorkletCount === 0 &&
+          window.__cueE2eAudio.postStopPcmCount === 0,
+        undefined,
+        { timeout: 2_000 },
+      );
       assert.deepEqual(fixture.networkRequests, []);
     } finally {
       await fixture.close();
@@ -446,7 +532,7 @@ test(
       await fixture.page.waitForFunction(
         () =>
           document.querySelector('#stop-btn')?.classList.contains('active') &&
-          window.__cueE2eAudio.pendingMediaRequestCount === 2,
+          window.__cueE2eAudio.pendingMediaRequestCount === 1,
       );
 
       await fixture.page.locator('#stop-btn').click();
@@ -457,18 +543,18 @@ test(
       await fixture.page.waitForFunction(
         () =>
           window.__cueE2eAudio.pendingMediaRequestCount === 0 &&
-          window.__cueE2eAudio.createdContextCount === 2 &&
-          window.__cueE2eAudio.closedContextCount === 2 &&
-          window.__cueE2eAudio.stoppedTrackCount === 3,
+          window.__cueE2eAudio.createdContextCount === 1 &&
+          window.__cueE2eAudio.closedContextCount === 1 &&
+          window.__cueE2eAudio.stoppedTrackCount === 1,
       );
       await fixture.page.waitForTimeout(50);
 
       const state = await fixture.page.evaluate(() => window.__cueE2eAudio);
-      assert.equal(state.createdWorkletCount, 2);
-      assert.equal(state.disconnectedWorkletCount, 2);
-      assert.equal(state.workletDisconnectCallCount, 2);
-      assert.equal(state.contextCloseCallCount, 2);
-      assert.equal(state.trackStopCallCount, 3);
+      assert.equal(state.createdWorkletCount, 1);
+      assert.equal(state.disconnectedWorkletCount, 1);
+      assert.equal(state.workletDisconnectCallCount, 1);
+      assert.equal(state.contextCloseCallCount, 1);
+      assert.equal(state.trackStopCallCount, 1);
       assert.equal(state.activeWorkletCount, 0);
       assert.equal(state.deliveredPcmCount, 0);
       assert.equal(state.postStopPcmCount, 0);
@@ -480,7 +566,7 @@ test(
 );
 
 test(
-  'E2E-CAPTURE-RECOVERY-001 retries cleanly after both worklet initializations fail',
+  'E2E-CAPTURE-RECOVERY-001 retries cleanly after microphone worklet initialization fails',
   { timeout: 10_000 },
   async () => {
     const fixture = await launchCue('healthy', {
@@ -490,12 +576,15 @@ test(
     try {
       await fixture.page.locator('#s-close').click();
       await fixture.page.locator('#stop-btn').click();
-      await fixture.page.waitForFunction(() => window.__cueE2eAudio.pendingMediaRequestCount === 2);
+      await fixture.page.waitForFunction(() => window.__cueE2eAudio.pendingMediaRequestCount === 1);
+      await fixture.page.waitForFunction(
+        () => document.documentElement.dataset.systemCaptureStatus === 'active',
+      );
       await fixture.page.evaluate(() => window.__cueE2eAudio.resolvePendingMediaRequests());
       await fixture.page.waitForFunction(
         () =>
-          window.__cueE2eAudio.createdContextCount === 2 &&
-          window.__cueE2eAudio.closedContextCount === 2 &&
+          window.__cueE2eAudio.createdContextCount === 1 &&
+          window.__cueE2eAudio.closedContextCount === 1 &&
           window.__cueE2eAudio.pendingMediaRequestCount === 0,
       );
       await fixture.page.locator('#stop-btn').click();
@@ -505,30 +594,33 @@ test(
       await fixture.page.evaluate(() => window.__cueE2eAudio.allowWorkletInitialization());
 
       await fixture.page.locator('#stop-btn').click();
-      await fixture.page.waitForFunction(() => window.__cueE2eAudio.pendingMediaRequestCount === 2);
+      await fixture.page.waitForFunction(() => window.__cueE2eAudio.pendingMediaRequestCount === 1);
+      await fixture.page.waitForFunction(
+        () => document.documentElement.dataset.systemCaptureStatus === 'active',
+      );
       await fixture.page.evaluate(() => window.__cueE2eAudio.resolvePendingMediaRequests());
       await fixture.page.waitForFunction(
         () =>
-          window.__cueE2eAudio.createdContextCount === 4 &&
-          window.__cueE2eAudio.createdWorkletCount === 2 &&
-          window.__cueE2eAudio.activeWorkletCount === 2,
+          window.__cueE2eAudio.createdContextCount === 2 &&
+          window.__cueE2eAudio.createdWorkletCount === 1 &&
+          window.__cueE2eAudio.activeWorkletCount === 1,
       );
       await fixture.page.locator('#stop-btn').click();
       await fixture.page.waitForFunction(
         () =>
-          window.__cueE2eAudio.closedContextCount === 4 &&
-          window.__cueE2eAudio.stoppedTrackCount === 6 &&
+          window.__cueE2eAudio.closedContextCount === 2 &&
+          window.__cueE2eAudio.stoppedTrackCount === 2 &&
           window.__cueE2eAudio.activeWorkletCount === 0,
       );
 
       const state = await fixture.page.evaluate(() => window.__cueE2eAudio);
       assert.equal(state.microphoneOpenCount, 2);
-      assert.equal(state.systemOpenCount, 2);
-      assert.equal(state.disconnectedWorkletCount, 2);
-      assert.equal(state.workletDisconnectCallCount, 2);
-      assert.equal(state.contextCloseCallCount, 4);
-      assert.equal(state.trackStopCallCount, 6);
+      assert.equal(state.disconnectedWorkletCount, 1);
+      assert.equal(state.workletDisconnectCallCount, 1);
+      assert.equal(state.contextCloseCallCount, 2);
+      assert.equal(state.trackStopCallCount, 2);
       assert.equal(state.postStopPcmCount, 0);
+      assert.deepEqual(await fixture.helperEvents(), ['start', 'stop', 'start', 'stop']);
       assert.deepEqual(fixture.networkRequests, []);
     } finally {
       await fixture.close();
@@ -558,16 +650,18 @@ test(
           await waitUntil(
             () =>
               button.classList.contains('active') &&
-              window.__cueE2eAudio.createdContextCount === cycle * 2 &&
-              window.__cueE2eAudio.activeWorkletCount === 2,
+              window.__cueE2eAudio.createdContextCount === cycle &&
+              window.__cueE2eAudio.activeWorkletCount === 1 &&
+              document.documentElement.dataset.systemCaptureStatus === 'active',
           );
           button.click();
           await waitUntil(
             () =>
               !button.classList.contains('active') &&
-              window.__cueE2eAudio.closedContextCount === cycle * 2 &&
-              window.__cueE2eAudio.stoppedTrackCount === cycle * 3 &&
-              window.__cueE2eAudio.activeWorkletCount === 0,
+              window.__cueE2eAudio.closedContextCount === cycle &&
+              window.__cueE2eAudio.stoppedTrackCount === cycle &&
+              window.__cueE2eAudio.activeWorkletCount === 0 &&
+              document.documentElement.dataset.systemCaptureStatus === 'idle',
           );
         }
       }, 100);
@@ -578,18 +672,20 @@ test(
 
       const state = await fixture.page.evaluate(() => window.__cueE2eAudio);
       assert.equal(state.microphoneOpenCount, 100);
-      assert.equal(state.systemOpenCount, 100);
-      assert.equal(state.createdContextCount, 200);
-      assert.equal(state.closedContextCount, 200);
-      assert.equal(state.contextCloseCallCount, 200);
-      assert.equal(state.createdWorkletCount, 200);
-      assert.equal(state.disconnectedWorkletCount, 200);
-      assert.equal(state.workletDisconnectCallCount, 200);
+      assert.equal(state.createdContextCount, 100);
+      assert.equal(state.closedContextCount, 100);
+      assert.equal(state.contextCloseCallCount, 100);
+      assert.equal(state.createdWorkletCount, 100);
+      assert.equal(state.disconnectedWorkletCount, 100);
+      assert.equal(state.workletDisconnectCallCount, 100);
       assert.equal(state.activeWorkletCount, 0);
-      assert.equal(state.stoppedTrackCount, 300);
-      assert.equal(state.trackStopCallCount, 300);
+      assert.equal(state.stoppedTrackCount, 100);
+      assert.equal(state.trackStopCallCount, 100);
       assert.equal(state.deliveredPcmCount, deliveredAtStop);
       assert.equal(state.postStopPcmCount, 0);
+      await waitForHelperEventCount(fixture, 200);
+      assert.equal((await fixture.helperEvents()).filter((event) => event === 'start').length, 100);
+      assert.equal((await fixture.helperEvents()).filter((event) => event === 'stop').length, 100);
       assert.deepEqual(fixture.networkRequests, []);
     } finally {
       await fixture.close();

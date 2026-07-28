@@ -1,5 +1,5 @@
 const DEBUG = false; // Set to false to disable debug logging
-const { app, BrowserWindow, ipcMain, globalShortcut, screen, session, desktopCapturer, shell } = require('electron');
+const { app, BrowserWindow, ipcMain, globalShortcut, screen, session, shell } = require('electron');
 const { resolveE2eRuntime } = require('./src/core/e2e-runtime-policy.cjs');
 const e2eRuntime = resolveE2eRuntime({
   enabled: process.env.CUE_E2E,
@@ -18,6 +18,7 @@ const { BoundedPcmBuffer } = require('./src/core/bounded-pcm-buffer');
 
 let win = null;
 let registeredAssistShortcut = null;
+let systemAudioCapture = null;
 
 const DEFAULT_ASSIST_SHORTCUT = 'CommandOrControl+Return';
 const RESERVED_SHORTCUTS = new Set([
@@ -135,15 +136,18 @@ function startFlushLoop() {
 function stopFlushLoop() { if (flushTimer) { clearInterval(flushTimer); flushTimer = null; } }
 
 // -------- capture toggle --------
-// Mic + system audio are both captured in the RENDERER (getUserMedia for the mic,
-// getDisplayMedia loopback for system audio) so they run inside cue's own process
-// and use cue's own Screen-Recording grant — no separate helper binary to authorize.
 function setCapturing(active) {
   state.capturing = active;
   if (active) {
     startFlushLoop();
+    systemAudioCapture?.start().catch((error) => {
+      console.log('[cue] system audio start failed:', error && error.code);
+    });
   } else {
     stopFlushLoop();
+    systemAudioCapture?.stop().catch((error) => {
+      console.log('[cue] system audio stop failed:', error && error.code);
+    });
     buffers.you.clear(); buffers.them.clear();
   }
   send('capture:state', { active });
@@ -211,7 +215,6 @@ ipcMain.handle('capture:toggle', () => setCapturing(!state.capturing));
 ipcMain.handle('capture:state', () => ({ active: state.capturing }));
 ipcMain.on('ask', (_e, payload) => runFeature(payload.mode, payload.text));
 ipcMain.on('mic:pcm', (_e, arrayBuffer) => { if (state.capturing) buffers.you.push(Buffer.from(arrayBuffer)); });
-ipcMain.on('system:pcm', (_e, arrayBuffer) => { if (state.capturing) buffers.them.push(Buffer.from(arrayBuffer)); });
 ipcMain.on('mouse:ignore', (_e, v) => { if (win) win.setIgnoreMouseEvents(!!v, { forward: true }); });
 ipcMain.on('open-pane', (_e, url) => { shell.openExternal(url).catch(() => {}); });
 ipcMain.on('log', (_e, msg) => console.log('[renderer]', msg));
@@ -266,21 +269,32 @@ function registerShortcuts() {
 }
 
 // -------- lifecycle --------
-app.whenReady().then(() => {
+app.whenReady().then(async () => {
   if (app.dock) app.dock.hide();
 
-  const allowMedia = (permission) => permission === 'media' || permission === 'microphone' || permission === 'audioCapture' || permission === 'display-capture' || permission === 'speaker-selection';
+  const allowMedia = (permission) => permission === 'media' || permission === 'microphone' || permission === 'speaker-selection';
   session.defaultSession.setPermissionRequestHandler((_wc, permission, cb) => cb(allowMedia(permission)));
   session.defaultSession.setPermissionCheckHandler((_wc, permission) => allowMedia(permission));
 
-  // System-audio loopback for getDisplayMedia: hand back a screen source with 'loopback'
-  // audio so the renderer can capture what's playing (Zoom/Meet) using cue's own grant.
-  session.defaultSession.setDisplayMediaRequestHandler((request, callback) => {
-    desktopCapturer.getSources({ types: ['screen'] }).then((sources) => {
-      if (sources.length) callback({ video: sources[0], audio: 'loopback' });
-      else callback();
-    }).catch(() => callback());
-  }, { useSystemPicker: false });
+  const { NativeSystemAudioCapture } = await import('./src/core/native-system-audio-capture.mjs');
+  const helperPath =
+    e2eRuntime.enabled && process.env.CUE_E2E_AUDIO_HELPER_PATH
+      ? process.env.CUE_E2E_AUDIO_HELPER_PATH
+      : app.isPackaged
+        ? path.join(process.resourcesPath, 'native', 'cue-audio-tap-helper')
+        : path.join(__dirname, 'build', 'native', 'cue-audio-tap-helper');
+  systemAudioCapture = new NativeSystemAudioCapture({
+    helperPath,
+    onPcm: (pcm) => {
+      if (state.capturing) buffers.them.push(pcm);
+    },
+    onState: (captureState) => {
+      if (captureState.status === 'idle' && captureState.metrics) {
+        console.log('[cue] system audio stopped', JSON.stringify(captureState.metrics));
+      }
+      send('system-capture:state', captureState);
+    },
+  });
 
   createWindow();
   if (!e2eRuntime.enabled) registerShortcuts();
@@ -288,5 +302,8 @@ app.whenReady().then(() => {
   app.on('activate', () => { if (BrowserWindow.getAllWindows().length === 0) createWindow(); });
 });
 
-app.on('will-quit', () => { globalShortcut.unregisterAll(); });
+app.on('will-quit', () => {
+  systemAudioCapture?.stop();
+  globalShortcut.unregisterAll();
+});
 app.on('window-all-closed', () => app.quit());

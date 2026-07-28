@@ -94,6 +94,10 @@ button:focus { outline: none; }
   animation: pulse 2s infinite;
 }
 #live-dot.off { background: rgba(255,255,255,0.28); box-shadow: none; animation: none; }
+#live-dot.degraded {
+  background: #f59e0b;
+  box-shadow: 0 0 0 3px rgba(245,158,11,0.24), 0 0 8px rgba(245,158,11,0.55);
+}
 
 .glass {
   background: rgba(20,22,28,0.72);
@@ -105,6 +109,19 @@ button:focus { outline: none; }
 }
 #panel { padding: 20px 22px; animation: overlayIn 260ms cubic-bezier(0.22,1,0.36,1); }
 #panel.collapsed { display: none; }
+.capture-health {
+  margin: 0 0 10px;
+  padding: 8px 12px;
+  border-radius: 10px;
+  background: rgba(245,158,11,0.12);
+  border: 1px solid rgba(245,158,11,0.34);
+  color: #fbd38d;
+  font-size: 12.5px;
+  line-height: 1.45;
+  -webkit-user-select: text;
+  user-select: text;
+}
+.capture-health.hidden { display: none; }
 
 /* ============================ Messages ============================ */
 #messages { display: flex; flex-direction: column; overflow-y: auto; max-height: 50vh; }
