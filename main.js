@@ -2,14 +2,19 @@ const DEBUG = false; // Set to false to disable debug logging
 const {
   app,
   BrowserWindow,
+  Menu,
+  nativeImage,
   ipcMain,
   globalShortcut,
   powerMonitor,
   screen,
   session,
   shell,
+  Tray,
 } = require('electron');
 const { resolveE2eRuntime } = require('./src/core/e2e-runtime-policy.cjs');
+const { createMenuBarController } = require('./src/core/menu-bar-controller.cjs');
+const { createShutdownCoordinator } = require('./src/core/shutdown-coordinator.cjs');
 const e2eRuntime = resolveE2eRuntime({
   enabled: process.env.CUE_E2E,
   userDataDir: process.env.CUE_E2E_USER_DATA_DIR,
@@ -31,6 +36,7 @@ let systemAudioCapture = null;
 let systemAudioCaptureScope = null;
 let canDispatchSystemPcm = () => false;
 let applicationCaptureScopeCoordinator = null;
+let menuBarController = null;
 
 const DEFAULT_ASSIST_SHORTCUT = 'CommandOrControl+Return';
 const RESERVED_SHORTCUTS = new Set(['commandorcontrol+h', 'commandorcontrol+shift+x']);
@@ -173,6 +179,24 @@ function stopFlushLoop() {
     flushTimer = null;
   }
 }
+
+async function cleanupBeforeQuit() {
+  state.capturing = false;
+  stopFlushLoop();
+  buffers.you.clear();
+  buffers.them.clear();
+  applicationCaptureScopeCoordinator?.invalidate();
+  await systemAudioCapture?.stop();
+  menuBarController?.dispose();
+  globalShortcut.unregisterAll();
+}
+
+const shutdownCoordinator = createShutdownCoordinator({
+  app,
+  cleanup: cleanupBeforeQuit,
+  onError: (error) => console.log('[cue] shutdown cleanup failed:', error && error.message),
+});
+app.on('before-quit', shutdownCoordinator.handleBeforeQuit);
 
 // -------- capture toggle --------
 function setCapturing(active) {
@@ -362,6 +386,13 @@ function registerShortcuts() {
 // -------- lifecycle --------
 app.whenReady().then(async () => {
   if (app.dock) app.dock.hide();
+  menuBarController = createMenuBarController({
+    Tray,
+    Menu,
+    nativeImage,
+    app,
+    iconPath: path.join(__dirname, 'assets', 'cueTemplate.png'),
+  });
 
   const allowMedia = (permission) =>
     permission === 'media' || permission === 'microphone' || permission === 'speaker-selection';
@@ -420,8 +451,4 @@ app.whenReady().then(async () => {
   });
 });
 
-app.on('will-quit', () => {
-  systemAudioCapture?.stop();
-  globalShortcut.unregisterAll();
-});
 app.on('window-all-closed', () => app.quit());

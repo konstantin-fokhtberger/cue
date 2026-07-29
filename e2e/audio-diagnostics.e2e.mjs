@@ -1139,6 +1139,45 @@ test(
 );
 
 test(
+  'E2E-MENUBAR-SHUTDOWN-001 normal quit waits for active capture cleanup',
+  { timeout: 10_000 },
+  async () => {
+    const fixture = await launchCue('healthy');
+    const electronProcess = fixture.electronApp.process();
+    let exited = false;
+    try {
+      await fixture.page.locator('#s-close').click();
+      await fixture.page.locator('#stop-btn').click();
+      await fixture.page.waitForFunction(() => window.__cueE2eAudio.microphoneOpenCount === 1);
+      await waitForHelperEventCount(fixture, 1);
+
+      const processExit = new Promise((resolve) => {
+        electronProcess.once('exit', () => {
+          exited = true;
+          resolve();
+        });
+      });
+      await fixture.electronApp
+        .evaluate(({ app }) => app.quit())
+        .catch((error) => {
+          if (!/closed|destroyed|disconnected/i.test(error.message)) throw error;
+        });
+      await processExit;
+      await waitForHelperEventCount(fixture, 2);
+
+      assert.deepEqual(await fixture.helperEvents(), ['start', 'stop']);
+      assert.deepEqual(fixture.networkRequests, []);
+    } finally {
+      if (exited) {
+        await fixture.cleanup();
+      } else {
+        await fixture.close();
+      }
+    }
+  },
+);
+
+test(
   'E2E-HELPER-PARENT-DEATH-001 exits the helper after abrupt Electron exit',
   { timeout: 10_000 },
   async () => {
