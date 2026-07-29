@@ -82,13 +82,13 @@
 
 ## Test plan
 
-| Level       | Test IDs                                    | Purpose                         |
-| ----------- | ------------------------------------------- | ------------------------------- |
-| Unit        | UT-AUDIO-DIAG-STATE-001                     | Deterministic state transitions |
-| Mutation    | MT-AUDIO-DIAG-001                           | Lifecycle assertion strength    |
-| Contract    | CT-AUDIO-DIAG-DEVICE-001, CT-AUDIO-DIAG-001 | Exact route and cleanup         |
-| E2E         | E2E-AUDIO-DIAG-001, E2E-AUDIO-DIAG-DENY-001 | Provider-free UI flow           |
-| Real device | RT-MAC-HYPERX-DIAG-001, RT-MAC-SONY-OUT-001 | Target hardware evidence        |
+| Level       | Test IDs                                                                    | Purpose                                  |
+| ----------- | --------------------------------------------------------------------------- | ---------------------------------------- |
+| Unit        | UT-AUDIO-DIAG-STATE-001                                                     | Deterministic state transitions          |
+| Mutation    | MT-AUDIO-DIAG-001                                                           | Lifecycle assertion strength             |
+| Contract    | CT-AUDIO-DIAG-DEVICE-001, CT-AUDIO-DIAG-001                                 | Exact route and cleanup                  |
+| E2E         | E2E-AUDIO-DIAG-001, E2E-AUDIO-DIAG-DENY-001, E2E-AUDIO-DIAG-MANUAL-STOP-001 | Provider-free UI flow and manual cleanup |
+| Real device | RT-MAC-HYPERX-DIAG-001, RT-MAC-SONY-OUT-001                                 | Target hardware evidence                 |
 
 ## Security and privacy
 
@@ -119,6 +119,8 @@
 - `E2E-AUDIO-DIAG-DENY-001`: both source Electron and the team-signed package converted
   an injected `NotAllowedError` into the typed local `permission-denied` UI state, made no
   provider request and returned the control to idle.
+- `E2E-AUDIO-DIAG-MANUAL-STOP-001`: one manual Stop releases the exact microphone track and
+  worklet once, produces no late PCM and does not restart the diagnostic.
 - E2E settings were isolated under a generated OS temporary directory. The runtime rejects
   missing, relative, filesystem-root and non-temporary E2E data paths.
 - Packaged local E2E passed against `com.cue.overlay`, team `6VS347Y94Z`, with stable

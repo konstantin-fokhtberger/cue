@@ -70,8 +70,8 @@
 
 The next implementation package should contain:
 
-1. `AUDIO-DEVICE-001` - complete live route-switch, disconnect/reconnect, and sleep/wake
-   acceptance.
+1. `AUDIO-DEVICE-001` - complete the remaining sleep/wake recovery acceptance; live exact
+   route selection and disconnect/reconnect fail-closed behavior are verified.
 2. `TEST-AUDIO-002` - automate the feasible provider x route matrix and preserve Teams as
    unverified until a conference is available.
 3. `UI-WINDOW-001` - add the accepted drag region.

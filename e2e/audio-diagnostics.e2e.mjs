@@ -188,12 +188,26 @@ function audioFixtureScript({ captureMode, microphoneMode, workletFailures }) {
     }
   }
 
-  const devices = [
+  let devices = [
     { kind: 'audioinput', deviceId: 'default', label: 'System default' },
     { kind: 'audioinput', deviceId: 'hyperx', label: 'HyperX SoloCast (fixture)' },
     { kind: 'audiooutput', deviceId: 'default', label: 'System default' },
     { kind: 'audiooutput', deviceId: 'sony', label: 'Sony Bluetooth (fixture)' },
   ];
+  const deviceChangeListeners = new Set();
+  state.removeOutputDevice = (deviceId) => {
+    devices = devices.filter(
+      (device) => device.kind !== 'audiooutput' || device.deviceId !== deviceId,
+    );
+    for (const listener of deviceChangeListeners) listener();
+  };
+  state.restoreOutputDevice = (deviceId, label) => {
+    devices = devices.filter(
+      (device) => device.kind !== 'audiooutput' || device.deviceId !== deviceId,
+    );
+    devices.push({ kind: 'audiooutput', deviceId, label });
+    for (const listener of deviceChangeListeners) listener();
+  };
 
   function resolveMediaRequest(createStream) {
     if (captureMode !== 'deferred') return Promise.resolve(createStream());
@@ -207,7 +221,9 @@ function audioFixtureScript({ captureMode, microphoneMode, workletFailures }) {
   }
 
   const mediaDevices = {
-    addEventListener() {},
+    addEventListener(type, listener) {
+      if (type === 'devicechange') deviceChangeListeners.add(listener);
+    },
     async enumerateDevices() {
       return devices;
     },
@@ -543,6 +559,84 @@ test('E2E-AUDIO-DIAG-001 uses exact local routes without provider traffic', asyn
     assert.deepEqual(state.openedInputIds, ['hyperx']);
     assert.equal(state.outputSinkIds.at(-1), 'sony');
     assert.equal(state.outputPlayCount, 1);
+    assert.deepEqual(fixture.networkRequests, []);
+  } finally {
+    await fixture.close();
+  }
+});
+
+test('E2E-AUDIO-DEVICE-OUTPUT-LOSS-001 fails closed and restores the exact output', async () => {
+  const fixture = await launchCue('healthy');
+  try {
+    await fixture.page.locator('#audio-output').selectOption('sony');
+    await fixture.page
+      .locator('#audio-output-effective')
+      .filter({ hasText: 'Effective: Sony Bluetooth (fixture)' })
+      .waitFor();
+    const sinkSelectionsBeforeLoss = await fixture.page.evaluate(
+      () => window.__cueE2eAudio.outputSinkIds.length,
+    );
+
+    await fixture.page.evaluate(() => window.__cueE2eAudio.removeOutputDevice('sony'));
+    await fixture.page
+      .locator('#audio-output-effective')
+      .filter({ hasText: 'Selected output is unavailable' })
+      .waitFor();
+    assert.equal(
+      await fixture.page.locator('#audio-output option:checked').textContent(),
+      'Unavailable device',
+    );
+
+    await fixture.page.locator('#audio-test-output').click();
+    await fixture.page
+      .locator('#audio-output-diagnostic-status')
+      .filter({ hasText: 'Output test failed: selected sink is unavailable.' })
+      .waitFor();
+    let state = await fixture.page.evaluate(() => window.__cueE2eAudio);
+    assert.equal(state.outputSinkIds.length, sinkSelectionsBeforeLoss);
+    assert.equal(state.outputPlayCount, 0);
+
+    await fixture.page.evaluate(() =>
+      window.__cueE2eAudio.restoreOutputDevice('sony', 'Sony Bluetooth (fixture)'),
+    );
+    await fixture.page
+      .locator('#audio-output-effective')
+      .filter({ hasText: 'Effective: Sony Bluetooth (fixture)' })
+      .waitFor();
+    assert.equal(
+      await fixture.page.locator('#audio-output option:checked').textContent(),
+      'Sony Bluetooth (fixture)',
+    );
+    assert.deepEqual(fixture.networkRequests, []);
+  } finally {
+    await fixture.close();
+  }
+});
+
+test('E2E-AUDIO-DIAG-MANUAL-STOP-001 stops once without restarting the microphone', async () => {
+  const fixture = await launchCue('healthy');
+  try {
+    await fixture.page.locator('#audio-input').selectOption('hyperx');
+    const microphoneButton = fixture.page.locator('#audio-test-input');
+    await microphoneButton.click();
+    await fixture.page
+      .locator('#audio-diagnostic-status')
+      .filter({ hasText: 'Signal detected · input: HyperX SoloCast (fixture)' })
+      .waitFor();
+
+    await microphoneButton.click();
+    await fixture.page
+      .locator('#audio-diagnostic-status')
+      .filter({ hasText: 'Stopped · input: HyperX SoloCast (fixture)' })
+      .waitFor();
+    assert.equal(await microphoneButton.textContent(), 'Test selected microphone');
+
+    const state = await fixture.page.evaluate(() => window.__cueE2eAudio);
+    assert.deepEqual(state.openedInputIds, ['hyperx']);
+    assert.equal(state.microphoneOpenCount, 1);
+    assert.equal(state.stoppedTrackCount, 1);
+    assert.equal(state.activeWorkletCount, 0);
+    assert.equal(state.postStopPcmCount, 0);
     assert.deepEqual(fixture.networkRequests, []);
   } finally {
     await fixture.close();

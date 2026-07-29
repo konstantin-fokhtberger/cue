@@ -51,14 +51,16 @@ Teams и Google Meet. Пользователь должен явно видет�
 
 ## Test plan
 
-| Level       | Test ID                     | Purpose                                      |
-| ----------- | --------------------------- | -------------------------------------------- |
-| Unit        | UT-AUDIO-DEVICE-POLICY-001  | Explicit selection and default fallback      |
-| Contract    | CT-AUDIO-DEVICE-POLICY-001  | Exact device constraints and no silent swap  |
-| Contract    | CT-AUDIO-OUTPUT-POLICY-001  | Exact cue playback sink and default fallback |
-| E2E         | E2E-AUDIO-DEVICE-SELECT-001 | Selector and effective-device presentation   |
-| Real device | RT-MAC-APP-OVERRIDE-001     | macOS Sony, meeting app HyperX, cue HyperX   |
-| Mutation    | MT-AUDIO-DEVICE-POLICY-001  | Fallback and mismatch assertion strength     |
+| Level       | Test ID                          | Purpose                                             |
+| ----------- | -------------------------------- | --------------------------------------------------- |
+| Unit        | UT-AUDIO-DEVICE-POLICY-001       | Explicit selection and default fallback             |
+| Contract    | CT-AUDIO-DEVICE-POLICY-001       | Exact device constraints and no silent swap         |
+| Contract    | CT-AUDIO-OUTPUT-POLICY-001       | Exact cue playback sink and default fallback        |
+| E2E         | E2E-AUDIO-DEVICE-SELECT-001      | Selector and effective-device presentation          |
+| E2E         | E2E-AUDIO-DEVICE-OUTPUT-LOSS-001 | Output loss is fail-closed and exact route recovers |
+| Real device | RT-MAC-APP-OVERRIDE-001          | macOS Sony, meeting app HyperX, cue HyperX          |
+| Real device | RT-MAC-DEVICE-LOSS-001           | Sony disconnect/reconnect without fallback          |
+| Mutation    | MT-AUDIO-DEVICE-POLICY-001       | Fallback and mismatch assertion strength            |
 
 ## Risks
 
@@ -89,7 +91,27 @@ Teams и Google Meet. Пользователь должен явно видет�
   output while HyperX remained available as a separate USB input. cue retained explicit
   HyperX input, accepted `.Sony (Bluetooth)` as its exact output sink, displayed it as
   effective, and persisted both selections across a full Quit/launch cycle.
-- Live HyperX stream/restart evidence remains open because the current Listen flow rejects
-  the request before capture when no transcription key is configured.
-- Audible cue-owned playback through Sony remains open because the current UI has no local
-  provider-free output test tone. The ended meeting cannot provide system-audio evidence.
+- Provider-free diagnostic opened exact HyperX, completed a controlled input restart and
+  automatically stopped without parallel streams or provider traffic.
+- The local output diagnostic applied exact `.Sony (Bluetooth)` and the user confirmed the
+  bounded 440 Hz tone was audible in the selected headphones.
+- `RT-MAC-DEVICE-LOSS-001` on the signed target package disconnected only Sony while cue
+  retained explicit HyperX input and Sony output. cue rendered the missing output as
+  `Unavailable device`, refused the output test with `selected sink is unavailable`, did not
+  offer a silent fallback, then restored exact `.Sony (Bluetooth)` after reconnection.
+- Sleep/wake recovery remains open and is intentionally a separate target-Mac acceptance
+  because suspending the machine interrupts the current control session.
+
+## Escaped-defect analysis: stale output sink after disconnect
+
+- Observation: the first target-Mac disconnect run retained the stale Sony `deviceId` as the
+  effective output and reported a successful test tone after the device disappeared.
+- Root cause: `applyCueOutput()` trusted `HTMLMediaElement.setSinkId()` to reject a stale
+  identifier. On the target Electron/macOS combination the call could retain that identifier
+  without proving that it was still present in the latest `enumerateDevices()` inventory.
+- Correction: explicit output routing now fails before `setSinkId()` unless the requested ID
+  exists in the current available-output map. Status rendering uses the same availability
+  gate and never exposes a stale raw ID as effective.
+- Regression model: `E2E-AUDIO-DEVICE-OUTPUT-LOSS-001` removes Sony from the runtime inventory,
+  asserts zero new sink selection and zero playback, verifies typed failure, restores Sony and
+  confirms the exact route is reapplied.

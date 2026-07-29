@@ -736,7 +736,9 @@ import { applicationSourceLabel } from '../src/core/application-capture-scope.mj
     }
 
     const requestedOutput = currentAudioDeviceId('outputId');
-    if (effectiveOutput && effectiveOutput.requestedId === requestedOutput) {
+    if (!availableOutputLabels.has(requestedOutput)) {
+      setDeviceStatus('#audio-output-effective', 'Selected output is unavailable', 'error');
+    } else if (effectiveOutput && effectiveOutput.requestedId === requestedOutput) {
       setDeviceStatus(
         '#audio-output-effective',
         'Effective: ' +
@@ -898,6 +900,11 @@ import { applicationSourceLabel } from '../src/core/application-capture-scope.mj
 
   async function applyCueOutput() {
     const requestedId = currentAudioDeviceId('outputId');
+    if (!availableOutputLabels.has(requestedId)) {
+      effectiveOutput = null;
+      setDeviceStatus('#audio-output-effective', 'Selected output is unavailable', 'error');
+      return false;
+    }
     try {
       effectiveOutput = await applyOutputSelection(cuePlayback, requestedId);
       syncAudioDeviceStatus();
