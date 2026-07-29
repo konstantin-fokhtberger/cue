@@ -568,6 +568,70 @@ async function waitForProcessExit(processID, timeoutMs = 5_000) {
   throw new Error(`Timed out waiting for native helper process ${processID} to exit.`);
 }
 
+async function windowSnapshot(electronApp) {
+  return electronApp.evaluate(({ BrowserWindow }) => {
+    const window = BrowserWindow.getAllWindows()[0];
+    return {
+      alwaysOnTop: window.isAlwaysOnTop(),
+      bounds: window.getBounds(),
+    };
+  });
+}
+
+test(
+  'E2E-WINDOW-DRAG-REGION-001 renders one isolated native drag handle',
+  { timeout: 10_000 },
+  async () => {
+    const fixture = await launchCue('healthy');
+    try {
+      await fixture.page.locator('#s-close').click();
+      const handle = fixture.page.locator('#window-drag-region');
+      await handle.waitFor({ state: 'visible', timeout: 2_000 });
+
+      const handleBounds = await handle.boundingBox();
+      assert.ok(handleBounds);
+      assert.ok(handleBounds.width >= 44);
+      assert.ok(handleBounds.height >= 28);
+      for (const button of await fixture.page.locator('#toolbar button').all()) {
+        const buttonBounds = await button.boundingBox();
+        assert.ok(buttonBounds);
+        assert.equal(
+          handleBounds.x < buttonBounds.x + buttonBounds.width &&
+            handleBounds.x + handleBounds.width > buttonBounds.x &&
+            handleBounds.y < buttonBounds.y + buttonBounds.height &&
+            handleBounds.y + handleBounds.height > buttonBounds.y,
+          false,
+        );
+      }
+
+      const style = await handle.evaluate((element) => {
+        const computed = getComputedStyle(element);
+        return {
+          appRegion: computed.webkitAppRegion,
+          cursor: computed.cursor,
+        };
+      });
+      assert.equal(style.appRegion, 'drag');
+      assert.equal(style.cursor, 'grab');
+
+      const windowState = await windowSnapshot(fixture.electronApp);
+      assert.equal(windowState.alwaysOnTop, true);
+      assert.equal(windowState.bounds.width, 700);
+      assert.equal(windowState.bounds.height, 600);
+      assert.equal(
+        await fixture.page
+          .locator('#stop-btn')
+          .evaluate((button) => button.classList.contains('active')),
+        false,
+      );
+      assert.deepEqual(await fixture.helperEvents(), []);
+      assert.deepEqual(fixture.networkRequests, []);
+    } finally {
+      await fixture.close();
+    }
+  },
+);
+
 const deterministicAudioRoutes = [
   {
     id: 'built-in-aligned',

@@ -64,8 +64,8 @@ body {
   pointer-events: auto;
 }
 #toolbar {
-  -webkit-app-region: drag;
-} /* the pill is the window's drag handle */
+  -webkit-app-region: no-drag;
+}
 .no-drag,
 button,
 input,
@@ -88,6 +88,30 @@ textarea {
     inset 0 1px 0 rgba(255, 255, 255, 0.08);
   backdrop-filter: blur(24px) saturate(160%);
   -webkit-backdrop-filter: blur(24px) saturate(160%);
+}
+#window-drag-region {
+  -webkit-app-region: drag;
+  min-width: 44px;
+  min-height: 28px;
+  display: grid;
+  place-items: center;
+  border-radius: var(--r-pill);
+  cursor: grab;
+  background: rgba(255, 255, 255, 0.045);
+}
+#window-drag-region::before {
+  content: '';
+  width: 18px;
+  height: 10px;
+  opacity: 0.58;
+  background-image: radial-gradient(circle, rgba(255, 255, 255, 0.82) 1.2px, transparent 1.4px);
+  background-size: 6px 5px;
+}
+#window-drag-region:hover {
+  background: rgba(255, 255, 255, 0.09);
+}
+#window-drag-region:active {
+  cursor: grabbing;
 }
 .tb-divider {
   width: 1px;

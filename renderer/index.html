@@ -13,10 +13,17 @@
     <div id="app">
       <!-- Top-center floating pill toolbar (drag handle) -->
       <div id="toolbar">
+        <div
+          id="window-drag-region"
+          role="group"
+          aria-label="Drag to move cue window"
+          title="Drag to move cue window"
+        ></div>
+        <div class="tb-divider" aria-hidden="true"></div>
         <button class="tb-logo" id="logo-btn" title="cue"></button>
-        <div class="tb-divider"></div>
+        <div class="tb-divider" aria-hidden="true"></div>
         <button class="tb-hide" id="hide-btn"><span class="chev"></span><span>Hide</span></button>
-        <div class="tb-divider"></div>
+        <div class="tb-divider" aria-hidden="true"></div>
         <button class="tb-stop" id="stop-btn" title="Start / stop listening"></button>
       </div>
 
