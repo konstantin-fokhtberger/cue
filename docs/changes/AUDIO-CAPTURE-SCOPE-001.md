@@ -182,8 +182,8 @@ closed.
 - Active-scope revalidation now propagates a dedicated
   `applicationScopeInvalidated` error through the control boundary. It no longer overloads an
   injected data byte that is misclassified as unexpected stdin data.
-- Target-Mac Chrome isolation and typed invalidation evidence passed. Zoom isolation and
-  cue-owned self-audio exclusion remain pending, so the change stays `in_progress`.
+- Target-Mac Chrome isolation, cue-owned self-audio exclusion, and typed invalidation evidence
+  passed. Zoom isolation remains pending, so the change stays `in_progress`.
 
 ## Verification evidence
 
@@ -243,6 +243,14 @@ closed.
   while Spotify remained the unrelated fixture. Revalidation terminated capture without timeout
   and emitted exactly `The selected application audio scope is no longer valid.` instead of the
   former control-data error.
+- Target-Mac cue self-audio exclusion used inventory generation 108 and verified Chrome PID 69103
+  at 48 kHz. The positive Chrome baseline contained 16,862 nonzero samples in the first 500 ms
+  with peak 0.55446. After an automated YouTube pause, two complete 500 ms buckets were exactly
+  zero before cue emitted its selected-output 440 Hz test tone for 500 ms. Three consecutive
+  500 ms buckets spanning and following the tone remained exactly zero (`nonzero: 0`, `peak: 0`).
+  The UI confirmed tone dispatch to the selected Sony output, the user independently confirmed
+  the tone was audible, and the helper stopped normally with code 0 and no error event. Raw audio
+  was not persisted.
 - CI regression: run 30380790580 failed because the runner's older SDK could not compile a direct
   reference to the macOS 26-only Swift property
   `CATapDescription.isProcessRestoreEnabled`. Follow-up
@@ -253,6 +261,6 @@ closed.
 ## Residual risks and follow-up
 
 - Chromium process ancestry may change across releases and requires target-Mac regression.
-- Live Chrome CoreAudio inclusion and Spotify rejection passed on the target Mac. Zoom isolation
-  and cue-owned self-audio rejection still require target-Mac evidence.
+- Live Chrome CoreAudio inclusion, Spotify rejection, and cue-owned self-audio rejection passed
+  on the target Mac. Zoom isolation still requires target-Mac evidence.
 - Teams remains unverified until a conference is available.
