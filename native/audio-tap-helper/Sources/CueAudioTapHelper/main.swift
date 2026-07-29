@@ -6,7 +6,7 @@ import Foundation
 private let ownerPID = getppid()
 private var activeScopeIsValid: () -> Bool = { true }
 
-private func readControlChunk() -> Data {
+private func readControlChunk() throws -> Data {
   while ownerPID > 1 && getppid() == ownerPID {
     var descriptor = pollfd(
       fd: STDIN_FILENO,
@@ -18,7 +18,7 @@ private func readControlChunk() -> Data {
       return FileHandle.standardInput.availableData
     }
     if result == 0 && !activeScopeIsValid() {
-      return Data([0])
+      throw HelperError.applicationScopeInvalidated
     }
     if result < 0 && errno != EINTR {
       return Data()

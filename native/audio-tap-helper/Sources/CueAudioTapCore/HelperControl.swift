@@ -141,12 +141,12 @@ public protocol HelperControlling {
 public final class StreamHelperControl: HelperControlling {
   private let decoder: HelperControlDecoder
   private let framer: HelperControlFramer
-  private let readChunk: () -> Data
+  private let readChunk: () throws -> Data
 
   public init(
     maximumMessageBytes: Int = 4_096,
     decoder: HelperControlDecoder = HelperControlDecoder(),
-    readChunk: @escaping () -> Data
+    readChunk: @escaping () throws -> Data
   ) {
     self.decoder = decoder
     framer = HelperControlFramer(maximumMessageBytes: maximumMessageBytes)
@@ -156,7 +156,7 @@ public final class StreamHelperControl: HelperControlling {
   public func readConfiguration() throws -> HelperConfiguration {
     var line: Data?
     repeat {
-      let chunk = readChunk()
+      let chunk = try readChunk()
       guard !chunk.isEmpty else {
         throw HelperError.controlClosed
       }
@@ -166,7 +166,7 @@ public final class StreamHelperControl: HelperControlling {
   }
 
   public func wait() throws {
-    let chunk = readChunk()
+    let chunk = try readChunk()
     guard chunk.isEmpty else {
       throw HelperError.unexpectedControlData
     }

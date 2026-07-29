@@ -174,6 +174,16 @@ final class HelperControlProtocolTests: XCTestCase {
     }
   }
 
+  func testStreamControlPropagatesApplicationScopeInvalidation() {
+    let control = StreamHelperControl(
+      readChunk: { throw HelperError.applicationScopeInvalidated }
+    )
+
+    XCTAssertThrowsError(try control.wait()) {
+      XCTAssertEqual($0 as? HelperError, .applicationScopeInvalidated)
+    }
+  }
+
   func testStreamControlPropagatesFramingAndDecodingFailures() {
     let oversized = StreamHelperControl(
       maximumMessageBytes: 3,

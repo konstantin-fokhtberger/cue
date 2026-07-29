@@ -11,6 +11,7 @@ public enum HelperError: Error, CustomStringConvertible, Equatable {
   case controlMessageTooLarge
   case invalidControlMessage
   case unexpectedControlData
+  case applicationScopeInvalidated
 
   public var description: String {
     switch self {
@@ -34,6 +35,8 @@ public enum HelperError: Error, CustomStringConvertible, Equatable {
       return "The helper control message is invalid or unsupported."
     case .unexpectedControlData:
       return "The helper control channel received unexpected data."
+    case .applicationScopeInvalidated:
+      return "The selected application audio scope is no longer valid."
     }
   }
 }

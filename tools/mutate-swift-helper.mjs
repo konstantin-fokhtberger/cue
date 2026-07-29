@@ -403,6 +403,11 @@ const controlMutations = [
     from: 'guard chunk.isEmpty else {',
     to: 'guard !chunk.isEmpty else {',
   },
+  {
+    id: 'control-scope-invalidation-propagates',
+    from: 'public func wait() throws {\n    let chunk = try readChunk()',
+    to: 'public func wait() throws {\n    let chunk = Data()',
+  },
 ];
 const resolverMutations = [
   {

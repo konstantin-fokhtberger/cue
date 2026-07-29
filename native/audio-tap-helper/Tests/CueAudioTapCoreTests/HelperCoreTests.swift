@@ -255,6 +255,10 @@ final class HelperErrorTests: XCTestCase {
       HelperError.unexpectedControlData.description,
       "The helper control channel received unexpected data."
     )
+    XCTAssertEqual(
+      HelperError.applicationScopeInvalidated.description,
+      "The selected application audio scope is no longer valid."
+    )
   }
 }
 
