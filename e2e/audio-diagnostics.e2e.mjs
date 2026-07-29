@@ -28,8 +28,10 @@ const sourceExecutable = path.join(
   'Electron',
 );
 
-function audioFixtureScript({ captureMode, microphoneMode, workletFailures }) {
+function audioFixtureScript({ captureMode, macosDefaults, microphoneMode, workletFailures }) {
   const state = {
+    macosDefaultInputId: macosDefaults.inputId,
+    macosDefaultOutputId: macosDefaults.outputId,
     microphoneMode,
     openedInputIds: [],
     microphoneOpenCount: 0,
@@ -190,8 +192,23 @@ function audioFixtureScript({ captureMode, microphoneMode, workletFailures }) {
 
   let devices = [
     { kind: 'audioinput', deviceId: 'default', label: 'System default' },
+    {
+      kind: 'audioinput',
+      deviceId: 'built-in-input',
+      label: 'MacBook Air Microphone (fixture)',
+    },
+    {
+      kind: 'audioinput',
+      deviceId: 'sony-input',
+      label: 'Sony Bluetooth Microphone (fixture)',
+    },
     { kind: 'audioinput', deviceId: 'hyperx', label: 'HyperX SoloCast (fixture)' },
     { kind: 'audiooutput', deviceId: 'default', label: 'System default' },
+    {
+      kind: 'audiooutput',
+      deviceId: 'built-in-output',
+      label: 'MacBook Air Speakers (fixture)',
+    },
     { kind: 'audiooutput', deviceId: 'sony', label: 'Sony Bluetooth (fixture)' },
   ];
   const deviceChangeListeners = new Set();
@@ -358,21 +375,37 @@ process.stdin.on('data', (chunk) => {
     }) + '\\n');
     process.exit(0);
   }
+  const captureScopes = new Map([
+    ['us.zoom.xos', {
+      browserWideAcknowledged: false,
+      displayName: 'zoom.us',
+      responsiblePid: 2000,
+    }],
+    ['com.google.Chrome', {
+      browserWideAcknowledged: true,
+      displayName: 'Google Chrome',
+      responsiblePid: 1000,
+    }],
+  ]);
+  const expectedScope = captureScopes.get(message.scope?.bundleIdentifier);
   if (
     message.command !== 'capture' ||
     message.protocolVersion !== 1 ||
     message.scope?.kind !== 'application' ||
     !Number.isSafeInteger(message.scope.inventoryGeneration) ||
     message.scope.inventoryGeneration <= 0 ||
-    message.scope.responsiblePid !== 2000 ||
-    message.scope.bundleIdentifier !== 'us.zoom.xos' ||
-    message.scope.browserWideAcknowledged !== false ||
+    expectedScope === undefined ||
+    message.scope.responsiblePid !== expectedScope.responsiblePid ||
+    message.scope.browserWideAcknowledged !== expectedScope.browserWideAcknowledged ||
     Object.keys(message).sort().join(',') !== 'command,protocolVersion,scope' ||
     Object.keys(message.scope).sort().join(',') !==
       'browserWideAcknowledged,bundleIdentifier,inventoryGeneration,kind,responsiblePid'
   ) process.exit(2);
   started = true;
-  appendFileSync(logPath, \`start:\${process.ppid}:\${process.pid}\\n\`);
+  appendFileSync(
+    logPath,
+    \`start:\${process.ppid}:\${process.pid}:\${message.scope.bundleIdentifier}\\n\`,
+  );
   if (mode === 'initialization-failed') {
     process.stderr.write('{"event":"error","message":"fixture failure"}\\n');
     process.exit(1);
@@ -386,9 +419,9 @@ process.stdin.on('data', (chunk) => {
       kind: 'application',
       verified: true,
       inventoryGeneration: message.scope.inventoryGeneration,
-      responsiblePid: 2000,
-      bundleIdentifier: 'us.zoom.xos',
-      displayName: 'zoom.us',
+      responsiblePid: expectedScope.responsiblePid,
+      bundleIdentifier: message.scope.bundleIdentifier,
+      displayName: expectedScope.displayName,
     },
   }) + '\\n');
   timer = setInterval(() => process.stdout.write(frame), 5);
@@ -419,7 +452,7 @@ async function launchCue(microphoneMode, fixtureOptions = {}) {
     JSON.stringify({
       onboarded: true,
       provider: 'openai',
-      audioDevices: { inputId: 'default', outputId: 'default' },
+      audioDevices: fixtureOptions.audioDevices || { inputId: 'default', outputId: 'default' },
       apiKeys: { openai: '', anthropic: '', gemini: '', nvidia: '' },
     }),
   );
@@ -457,6 +490,10 @@ async function launchCue(microphoneMode, fixtureOptions = {}) {
   });
   await page.addInitScript(audioFixtureScript, {
     captureMode: fixtureOptions.captureMode || 'immediate',
+    macosDefaults: fixtureOptions.macosDefaults || {
+      inputId: 'default',
+      outputId: 'default',
+    },
     microphoneMode,
     workletFailures: fixtureOptions.workletFailures || 0,
   });
@@ -530,6 +567,143 @@ async function waitForProcessExit(processID, timeoutMs = 5_000) {
   }
   throw new Error(`Timed out waiting for native helper process ${processID} to exit.`);
 }
+
+const deterministicAudioRoutes = [
+  {
+    id: 'built-in-aligned',
+    defaultInputId: 'built-in-input',
+    defaultOutputId: 'built-in-output',
+    inputId: 'built-in-input',
+    inputLabel: 'MacBook Air Microphone (fixture)',
+    outputId: 'built-in-output',
+    outputLabel: 'MacBook Air Speakers (fixture)',
+  },
+  {
+    id: 'bluetooth-aligned',
+    defaultInputId: 'sony-input',
+    defaultOutputId: 'sony',
+    inputId: 'sony-input',
+    inputLabel: 'Sony Bluetooth Microphone (fixture)',
+    outputId: 'sony',
+    outputLabel: 'Sony Bluetooth (fixture)',
+  },
+  {
+    id: 'usb-bluetooth-aligned',
+    defaultInputId: 'hyperx',
+    defaultOutputId: 'sony',
+    inputId: 'hyperx',
+    inputLabel: 'HyperX SoloCast (fixture)',
+    outputId: 'sony',
+    outputLabel: 'Sony Bluetooth (fixture)',
+  },
+  {
+    id: 'explicit-app-override',
+    defaultInputId: 'sony-input',
+    defaultOutputId: 'sony',
+    inputId: 'hyperx',
+    inputLabel: 'HyperX SoloCast (fixture)',
+    outputId: 'sony',
+    outputLabel: 'Sony Bluetooth (fixture)',
+  },
+];
+
+async function runDeterministicApplicationRouteMatrix(application) {
+  for (const route of deterministicAudioRoutes) {
+    const fixture = await launchCue('healthy', {
+      audioDevices: { inputId: route.inputId, outputId: route.outputId },
+      macosDefaults: { inputId: route.defaultInputId, outputId: route.defaultOutputId },
+      selectApplication: false,
+    });
+    try {
+      const applicationSelector = fixture.page.locator('#capture-application');
+      await applicationSelector
+        .locator('option', { hasText: application.optionLabel })
+        .waitFor({ state: 'attached' });
+      await applicationSelector.selectOption({ label: application.optionLabel });
+      if (application.browserWide) {
+        await fixture.page.locator('#capture-browser-ack').check();
+      }
+      await fixture.page
+        .locator('#capture-application-status')
+        .filter({ hasText: `Requested: ${application.displayName}.` })
+        .waitFor();
+      await fixture.page
+        .locator('#audio-output-effective')
+        .filter({ hasText: `Effective: ${route.outputLabel}` })
+        .waitFor();
+
+      await fixture.page.locator('#s-close').click();
+      await fixture.page.locator('#stop-btn').click();
+      await fixture.page.waitForFunction(() => window.__cueE2eAudio.microphoneOpenCount === 1);
+      await waitForHelperEventCount(fixture, 1);
+      await fixture.page.waitForFunction(
+        ({ applicationText, inputText }) =>
+          document
+            .querySelector('#capture-application-status')
+            ?.textContent.includes(applicationText) &&
+          document.querySelector('#audio-input-effective')?.textContent.includes(inputText),
+        {
+          applicationText: `Effective: verified ${application.displayName}.`,
+          inputText: `Effective: ${route.inputLabel}`,
+        },
+      );
+
+      await fixture.page.locator('#stop-btn').click();
+      await fixture.page.waitForFunction(
+        () =>
+          !document.querySelector('#stop-btn')?.classList.contains('active') &&
+          window.__cueE2eAudio.stoppedTrackCount === 1 &&
+          window.__cueE2eAudio.activeWorkletCount === 0,
+      );
+      await waitForHelperEventCount(fixture, 2);
+
+      const state = await fixture.page.evaluate(() => window.__cueE2eAudio);
+      assert.equal(state.macosDefaultInputId, route.defaultInputId, route.id);
+      assert.equal(state.macosDefaultOutputId, route.defaultOutputId, route.id);
+      assert.deepEqual(state.openedInputIds, [route.inputId], route.id);
+      assert.equal(state.outputSinkIds.at(-1), route.outputId, route.id);
+      assert.equal(state.createdContextCount, 1, route.id);
+      assert.equal(state.closedContextCount, 1, route.id);
+      assert.equal(state.createdWorkletCount, 1, route.id);
+      assert.equal(state.disconnectedWorkletCount, 1, route.id);
+      assert.equal(state.postStopPcmCount, 0, route.id);
+      assert.deepEqual(
+        (await fixture.helperRawEvents())
+          .filter((event) => event.startsWith('start:'))
+          .map((event) => event.split(':')[3]),
+        [application.bundleIdentifier],
+        route.id,
+      );
+      assert.deepEqual(fixture.networkRequests, [], route.id);
+    } finally {
+      await fixture.close();
+    }
+  }
+}
+
+test(
+  'E2E-AUDIO-MATRIX-ZOOM-001 covers Zoom across deterministic cue route variants',
+  { timeout: 30_000 },
+  () =>
+    runDeterministicApplicationRouteMatrix({
+      browserWide: false,
+      bundleIdentifier: 'us.zoom.xos',
+      displayName: 'zoom.us',
+      optionLabel: 'zoom.us',
+    }),
+);
+
+test(
+  'E2E-AUDIO-MATRIX-MEET-001 covers browser-wide Chrome/Meet across deterministic cue route variants',
+  { timeout: 30_000 },
+  () =>
+    runDeterministicApplicationRouteMatrix({
+      browserWide: true,
+      bundleIdentifier: 'com.google.Chrome',
+      displayName: 'Google Chrome',
+      optionLabel: 'Google Chrome - all audible tabs in this browser instance',
+    }),
+);
 
 test('E2E-AUDIO-DIAG-001 uses exact local routes without provider traffic', async () => {
   const fixture = await launchCue('healthy');
@@ -1084,6 +1258,7 @@ test(
       assert.equal(state.contextCloseCallCount, 2);
       assert.equal(state.trackStopCallCount, 2);
       assert.equal(state.postStopPcmCount, 0);
+      await waitForHelperEventCount(fixture, 4);
       assert.deepEqual(await fixture.helperEvents(), ['start', 'stop', 'start', 'stop']);
       assert.deepEqual(fixture.networkRequests, []);
     } finally {
