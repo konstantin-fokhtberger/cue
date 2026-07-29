@@ -59,7 +59,7 @@
 | MEET-003                | EPIC-005 |       P1 | proposed    | Follow-up questions                                                                 | MEET-002                                     |
 | MEET-004                | EPIC-005 |       P1 | proposed    | Recap, decisions, and action items                                                  | STT-002                                      |
 | MEET-005                | EPIC-005 |       P1 | proposed    | Speaker label rename and correction UI                                              | STT-002                                      |
-| UI-WINDOW-001           | EPIC-009 |       P1 | in_progress | Add a safe upper drag region for moving the overlay across displays                 | None                                         |
+| UI-WINDOW-001           | EPIC-009 |       P1 | done        | Add a safe upper drag region for moving the overlay across displays                 | None                                         |
 | UI-MENUBAR-001          | EPIC-009 |       P1 | ready       | Add a menu bar status item with graceful `Close app` action                         | None                                         |
 | PKG-001                 | EPIC-006 |       P1 | proposed    | Signed, hardened, notarized daily-use package                                       | ADR-AUDIO-001                                |
 | REL-001                 | EPIC-001 |       P1 | proposed    | Long-session, fault-injection, and performance release gate                         | Meeting MVP                                  |

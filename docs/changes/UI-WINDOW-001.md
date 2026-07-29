@@ -6,7 +6,7 @@
 | --------------- | -------------------------------- |
 | Backlog ID      | UI-WINDOW-001                    |
 | Requirement IDs | FR-SHELL-001                     |
-| Status          | in_progress                      |
+| Status          | verified                         |
 | Owner           | project maintainer               |
 | Target revision | current audio feasibility branch |
 
@@ -117,5 +117,8 @@
 - A Playwright renderer drag did not synthesize native macOS movement, as expected for this
   platform boundary. A Computer Use drag action also produced no observable bounds change and
   is not accepted as physical evidence.
-- Physical trackpad/mouse movement and cross-display acceptance remain pending; the backlog item
-  therefore remains `in_progress`.
+- `RT-MAC-MULTIDISPLAY-DRAG-001`: the target Mac had the built-in Color LCD
+  (`1710 x 1107`) and Mi Monitor (`3440 x 1440`) connected. The product owner physically moved
+  the signed-package cue window within a display and between both displays using the new handle,
+  and confirmed that adjacent controls remained operable.
+- Physical native movement and cross-display acceptance pass. `UI-WINDOW-001` is complete.
