@@ -92,26 +92,26 @@ closed.
 
 ## Failure modes
 
-| Failure                    | Expected behavior                   | Test ID                          |
-| -------------------------- | ----------------------------------- | -------------------------------- |
-| Empty bundle identity      | Explicit unresolved source          | UT-SCOPE-EMPTY-IDENTITY-001      |
-| Multiple app instances     | Separate selectable instances       | CT-SCOPE-INSTANCE-001            |
-| Stale inventory generation | Start rejected; refresh required    | CT-SCOPE-STALE-001               |
-| Selected process exits     | Scope becomes stale; no fallback    | E2E-CAPTURE-SCOPE-EXIT-001       |
-| Chrome not acknowledged    | Start rejected locally              | E2E-BROWSER-SCOPE-DISCLOSURE-001 |
-| cue output is active       | Zero accepted remote-channel signal | RT-MAC-SELF-AUDIO-001            |
+| Failure                    | Expected behavior                     | Test ID                          |
+| -------------------------- | ------------------------------------- | -------------------------------- |
+| Empty bundle identity      | Explicit unresolved source            | UT-SCOPE-EMPTY-IDENTITY-001      |
+| Multiple app instances     | Separate selectable instances         | CT-SCOPE-INSTANCE-001            |
+| Stale inventory generation | Start rejected; refresh required      | CT-SCOPE-STALE-001               |
+| Selected process exits     | Typed scope invalidation; no fallback | E2E-CAPTURE-SCOPE-EXIT-001       |
+| Chrome not acknowledged    | Start rejected locally                | E2E-BROWSER-SCOPE-DISCLOSURE-001 |
+| cue output is active       | Zero accepted remote-channel signal   | RT-MAC-SELF-AUDIO-001            |
 
 ## Test plan
 
-| Level       | Test IDs                                                                                                                                        | Purpose                                       |
-| ----------- | ----------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------- |
-| Unit        | UT-SCOPE-RESOLVER-001, UT-SCOPE-EMPTY-IDENTITY-001                                                                                              | normalization and fail-closed                 |
-| Property    | PT-SCOPE-PROCESS-GRAPH-001                                                                                                                      | ancestry graph combinations                   |
-| Mutation    | MT-SCOPE-POLICY-001, MT-SCOPE-INVENTORY-001                                                                                                     | policy assertion strength                     |
-| Contract    | CT-CAPTURE-SCOPE-001, CT-SCOPE-INSTANCE-001, CT-SCOPE-LIVE-INVENTORY-001, CT-SCOPE-STALE-001, CT-SCOPE-EFFECTIVE-001, CT-SCOPE-INVALIDATION-001 | IPC, resolver, inclusion tap, effective scope |
-| Integration | CT-NO-GLOBAL-STT-001                                                                                                                            | provider boundary                             |
-| E2E         | E2E-CAPTURE-SCOPE-001, E2E-BROWSER-SCOPE-DISCLOSURE-001                                                                                         | selection and disclosure UI                   |
-| Real device | RT-MAC-APP-SCOPE-001, RT-MAC-SELF-AUDIO-001                                                                                                     | isolation and self-exclusion                  |
+| Level       | Test IDs                                                                                                                                                                         | Purpose                                       |
+| ----------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------- |
+| Unit        | UT-SCOPE-RESOLVER-001, UT-SCOPE-EMPTY-IDENTITY-001                                                                                                                               | normalization and fail-closed                 |
+| Property    | PT-SCOPE-PROCESS-GRAPH-001                                                                                                                                                       | ancestry graph combinations                   |
+| Mutation    | MT-SCOPE-POLICY-001, MT-SCOPE-INVENTORY-001                                                                                                                                      | policy assertion strength                     |
+| Contract    | CT-CAPTURE-SCOPE-001, CT-SCOPE-INSTANCE-001, CT-SCOPE-LIVE-INVENTORY-001, CT-SCOPE-STALE-001, CT-SCOPE-EFFECTIVE-001, CT-SCOPE-INVALIDATION-001, CT-SCOPE-INVALIDATION-ERROR-001 | IPC, resolver, inclusion tap, effective scope |
+| Integration | CT-NO-GLOBAL-STT-001                                                                                                                                                             | provider boundary                             |
+| E2E         | E2E-CAPTURE-SCOPE-001, E2E-BROWSER-SCOPE-DISCLOSURE-001                                                                                                                          | selection and disclosure UI                   |
+| Real device | RT-MAC-APP-SCOPE-001, RT-MAC-SELF-AUDIO-001                                                                                                                                      | isolation and self-exclusion                  |
 
 ## Security and privacy
 
@@ -179,8 +179,11 @@ closed.
   unverified, extended, or mismatched metadata before accepting PCM for provider dispatch.
 - The renderer presents requested and effective scope separately. Capture cannot start without a
   current main-process-owned selection.
-- Target-Mac Chrome and Zoom isolation evidence remains pending, so the change stays
-  `in_progress`.
+- Active-scope revalidation now propagates a dedicated
+  `applicationScopeInvalidated` error through the control boundary. It no longer overloads an
+  injected data byte that is misclassified as unexpected stdin data.
+- Target-Mac Chrome isolation and typed invalidation evidence passed. Zoom isolation and
+  cue-owned self-audio exclusion remain pending, so the change stays `in_progress`.
 
 ## Verification evidence
 
@@ -202,8 +205,11 @@ closed.
   and effective scope, exact inclusion IDs, selected devices, revalidation, application control
   decoding, and fresh-generation platform forwarding. The final JS gate killed 1,644 mutants with
   4 accepted timeouts, 0 survivors, and 0 uncovered mutants.
-- Performance: pending.
-- Real device: pending.
+- Performance: the accepted Chrome signal and invalidation probes sustained the live 48 kHz mono
+  callback stream without a pending-byte overflow; formal long-session performance remains
+  pending.
+- Real device: Chrome/Spotify application isolation passed on the target Mac. Zoom isolation and
+  cue-owned self-audio exclusion remain pending.
 - Package: the current slice passed local arm64 ad-hoc packaging, strict signing-policy
   inspection, source E2E 11/11, and packaged E2E 11/11. The ad-hoc CI-style package correctly
   reports `tccStable: false`; stable local TCC identity is not claimed by this evidence.
@@ -218,6 +224,25 @@ closed.
 - Native inclusion contract: Swift unit and adapter tests cover exact application command
   decoding, fresh live resolution, nonempty inclusion IDs, selected-device-only aggregate input,
   sanitized effective metadata, and fail-closed scope revalidation.
+- Target-Mac Chrome/Spotify isolation: inventory generation 101 resolved Chrome PID 69103 and
+  Spotify PID 19799 as distinct applications on the same Sony output. An 8-second Chrome-only tap
+  produced 344,576 samples, 337,438 nonzero samples, peak 0.62045, and verified Chrome effective
+  scope. In a second run, the user paused YouTube in Chrome while Spotify remained audible:
+  Chrome capture transitioned through one partial second and then produced exactly zero nonzero
+  samples and peak 0 for ten consecutive measured seconds. Spotify did not enter the selected
+  Chrome PCM and no global fallback occurred. Raw audio was not persisted.
+- Scope-invalidation RCA: the live revalidation path returned `Data([0])` as an internal sentinel,
+  which `StreamHelperControl.wait()` classified as unexpected control data. The replacement uses
+  a throwing control-read boundary and the sanitized typed error
+  `The selected application audio scope is no longer valid.` The focused regression test failed
+  before implementation, then passed with 68/68 Swift tests, complete structural coverage, and
+  135/135 killed Swift mutants including `control-scope-invalidation-propagates`.
+- Live regression on the rebuilt stable-identity package used inventory generation 102 and the
+  same distinct Chrome/Spotify identities. Chrome produced nonzero signal for seconds 0-6, one
+  partial transition second, then exactly zero nonzero samples and zero peak for seconds 8-17
+  while Spotify remained the unrelated fixture. Revalidation terminated capture without timeout
+  and emitted exactly `The selected application audio scope is no longer valid.` instead of the
+  former control-data error.
 - CI regression: run 30380790580 failed because the runner's older SDK could not compile a direct
   reference to the macOS 26-only Swift property
   `CATapDescription.isProcessRestoreEnabled`. Follow-up
@@ -228,7 +253,6 @@ closed.
 ## Residual risks and follow-up
 
 - Chromium process ancestry may change across releases and requires target-Mac regression.
-- Live CoreAudio inclusion behavior and unrelated-audio rejection have not yet been accepted on the
-  target Mac. Structural, fixture, and package checks are necessary but do not substitute for that
-  evidence.
+- Live Chrome CoreAudio inclusion and Spotify rejection passed on the target Mac. Zoom isolation
+  and cue-owned self-audio rejection still require target-Mac evidence.
 - Teams remains unverified until a conference is available.
