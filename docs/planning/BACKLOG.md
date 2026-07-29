@@ -37,7 +37,7 @@
 | BUG-AUDIO-002           | EPIC-002 |       P0 | done        | Restore and expose macOS CoreAudio Tap system capture                               | SPIKE-AUDIO-001, TEST-AUDIO-001              |
 | BUG-AUDIO-003           | EPIC-006 |       P0 | done        | Remove implicit ScreenCapture permission from Meeting mode                          | BUG-AUDIO-002                                |
 | ADR-DEVICE-001          | EPIC-002 |       P0 | done        | Accept cue input/output selection and fallback policy                               | SPIKE-AUDIO-001                              |
-| AUDIO-DEVICE-001        | EPIC-002 |       P0 | active      | Explicit cue input/output selectors and effective-device diagnostics                | ADR-DEVICE-001, TEST-AUDIO-001               |
+| AUDIO-DEVICE-001        | EPIC-002 |       P0 | in_progress | Explicit cue input/output selectors and effective-device diagnostics                | ADR-DEVICE-001, TEST-AUDIO-001               |
 | AUDIO-DIAG-001          | EPIC-002 |       P0 | done        | Local provider-free microphone/output diagnostics                                   | AUDIO-DEVICE-001, TEST-AUDIO-001             |
 | BUG-PKG-001             | EPIC-006 |       P0 | done        | Стабилизировать identity `com.cue.overlay` в тестовых macOS-пакетах                 | SPIKE-AUDIO-001                              |
 | TEST-AUDIO-001          | EPIC-002 |       P0 | done        | Capture adapter contract suite and deterministic audio fixtures                     | TOOL-001                                     |
@@ -46,7 +46,7 @@
 | TEST-NATIVE-AUDIO-001   | EPIC-002 |       P0 | done        | Complete Swift structural/mutation gates with an injected CoreAudio policy boundary | ADR-AUDIO-001                                |
 | BUG-AUDIO-004           | EPIC-002 |       P0 | done        | Terminate native helper and release CoreAudio resources on parent death             | ADR-AUDIO-001, TEST-NATIVE-AUDIO-001         |
 | ADR-CAPTURE-SCOPE-001   | EPIC-006 |       P0 | done        | Accept explicit application scope and disclosed browser-wide Chrome capture         | ADR-AUDIO-001                                |
-| AUDIO-CAPTURE-SCOPE-001 | EPIC-002 |       P0 | in_progress | Implement verified application scope, cue exclusion, and no-global-fallback policy  | ADR-CAPTURE-SCOPE-001, TEST-NATIVE-AUDIO-001 |
+| AUDIO-CAPTURE-SCOPE-001 | EPIC-002 |       P0 | done        | Implement verified application scope, cue exclusion, and no-global-fallback policy  | ADR-CAPTURE-SCOPE-001, TEST-NATIVE-AUDIO-001 |
 | ARCH-SESSION-001        | EPIC-003 |       P0 | proposed    | Pure session state machine with generation cancellation                             | TOOL-001                                     |
 | ARCH-TIMELINE-001       | EPIC-003 |       P0 | proposed    | Session-scoped transcript event model                                               | ARCH-SESSION-001                             |
 | ARCH-PROVIDER-001       | EPIC-006 |       P0 | proposed    | Provider policy with fallback disabled by default                                   | TOOL-001                                     |
@@ -70,17 +70,16 @@
 
 The next implementation package should contain:
 
-1. `AUDIO-CAPTURE-SCOPE-001` - build verified application scope and source-selection UI on the
-   completed `BUG-AUDIO-004` versioned parent-liveness protocol, without a global fallback.
-2. `AUDIO-DEVICE-001` - complete live route-switch, disconnect/reconnect, and sleep/wake
+1. `AUDIO-DEVICE-001` - complete live route-switch, disconnect/reconnect, and sleep/wake
    acceptance.
-3. `TEST-AUDIO-002` - automate the feasible provider x route matrix and preserve Teams as
+2. `TEST-AUDIO-002` - automate the feasible provider x route matrix and preserve Teams as
    unverified until a conference is available.
-4. `UI-WINDOW-001` - add the accepted drag region.
-5. `UI-MENUBAR-001` - add graceful menu bar shutdown with capture cleanup evidence.
+3. `UI-WINDOW-001` - add the accepted drag region.
+4. `UI-MENUBAR-001` - add graceful menu bar shutdown with capture cleanup evidence.
 
-STT and meeting-assistance feature work must not begin before the global capture-scope privacy
-risk and parent-death lifecycle gap are closed.
+The global capture-scope privacy risk and parent-death lifecycle gap are closed. STT work can
+begin after the remaining explicit-device acceptance is complete; meeting-assistance features
+still depend on the session, timeline, and STT foundations.
 
 ## Current meeting-application evidence
 
@@ -91,6 +90,11 @@ risk and parent-death lifecycle gap are closed.
   after Stop.
 - The Zoom run was launched from Codex, so its TCC attribution is not accepted as an independent
   standalone identity test. The earlier signed-package Google Meet run remains the TCC evidence.
+- Zoom application-scope isolation passed with Spotify continuously playing on the same Sony
+  Bluetooth output. The verified Zoom tap was exactly zero before and after Zoom's own speaker
+  fixture, while the fixture produced 446,374 nonzero samples with peak 0.69581. This deterministic
+  fixture proves Zoom-vs-Spotify isolation; the earlier two-participant run remains the
+  real-meeting-signal evidence.
 - Microsoft Teams is waived only for the current manual spike because the product owner cannot
   create a test conference. It remains an unverified release requirement and is not recorded as
   passed.

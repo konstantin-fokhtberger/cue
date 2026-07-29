@@ -6,7 +6,7 @@
 | --------------- | ---------------------------------------- |
 | Backlog ID      | AUDIO-CAPTURE-SCOPE-001                  |
 | Requirement IDs | FR-AUDIO-003, FR-AUDIO-010, FR-PRIV-007  |
-| Status          | in_progress                              |
+| Status          | verified                                 |
 | Owner           | project maintainer                       |
 | Target revision | `spike/SPIKE-AUDIO-001-electron-capture` |
 
@@ -182,8 +182,8 @@ closed.
 - Active-scope revalidation now propagates a dedicated
   `applicationScopeInvalidated` error through the control boundary. It no longer overloads an
   injected data byte that is misclassified as unexpected stdin data.
-- Target-Mac Chrome isolation, cue-owned self-audio exclusion, and typed invalidation evidence
-  passed. Zoom isolation remains pending, so the change stays `in_progress`.
+- Target-Mac Chrome and Zoom isolation, cue-owned self-audio exclusion, and typed invalidation
+  evidence passed. All acceptance criteria for this change are verified.
 
 ## Verification evidence
 
@@ -251,6 +251,16 @@ closed.
   The UI confirmed tone dispatch to the selected Sony output, the user independently confirmed
   the tone was audible, and the helper stopped normally with code 0 and no error event. Raw audio
   was not persisted.
+- Target-Mac Zoom/Spotify application isolation used inventory generation 109. CoreAudio resolved
+  Zoom PID 50735 and Spotify PID 51252 as distinct applications on the same Sony Bluetooth output.
+  With Spotify continuously playing, the verified Zoom tap first produced 250,880 samples with
+  exactly zero nonzero samples and zero peak. Zoom's own deterministic speaker-test fixture then
+  produced 867,840 samples, 446,374 nonzero samples, and peak 0.69581 through the same verified
+  Zoom scope. After the Zoom fixture was stopped, a second verified Zoom tap produced 253,440
+  samples with exactly zero nonzero samples and zero peak while Spotify was still confirmed as
+  playing. All three helper runs exited normally with code 0; no global fallback or raw-audio
+  persistence occurred. The speaker fixture proves application-scope isolation; the earlier
+  two-participant Zoom meeting remains the evidence for real meeting signal capture.
 - CI regression: run 30380790580 failed because the runner's older SDK could not compile a direct
   reference to the macOS 26-only Swift property
   `CATapDescription.isProcessRestoreEnabled`. Follow-up
@@ -262,5 +272,5 @@ closed.
 
 - Chromium process ancestry may change across releases and requires target-Mac regression.
 - Live Chrome CoreAudio inclusion, Spotify rejection, and cue-owned self-audio rejection passed
-  on the target Mac. Zoom isolation still requires target-Mac evidence.
+  on the target Mac. Zoom CoreAudio inclusion and Spotify rejection also passed.
 - Teams remains unverified until a conference is available.
