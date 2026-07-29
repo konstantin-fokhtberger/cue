@@ -68,6 +68,7 @@ import { applicationSourceLabel } from '../src/core/application-capture-scope.mj
   let diagnosticHealthTimer = null;
   let diagnosticAutoStopTimer = null;
   let diagnosticTransition = Promise.resolve();
+  let powerTransition = Promise.resolve();
 
   const messages = $('#messages');
 
@@ -457,6 +458,32 @@ import { applicationSourceLabel } from '../src/core/application-capture-scope.mj
   cue.on('status', ({ message }) => {
     cue.log('[status] ' + message);
     showStatus(message);
+  });
+  cue.on('power:state', ({ status }) => {
+    powerTransition = powerTransition.then(async () => {
+      if (status === 'suspended') {
+        document.documentElement.dataset.powerState = 'suspended';
+        await queueDiagnosticTransition(stopMicrophoneDiagnostic);
+        await outputDiagnosticTone.stop();
+        effectiveInput = null;
+        effectiveOutput = null;
+        applicationInventory = null;
+        requestedApplicationScope = null;
+        effectiveApplicationScope = null;
+        syncAudioDeviceStatus();
+        renderApplicationInventory();
+        showStatus('Mac is sleeping. Audio capture stopped.');
+        return;
+      }
+      if (status === 'resumed') {
+        document.documentElement.dataset.powerState = 'resumed';
+        await refreshAudioDevices();
+        await refreshApplicationInventory();
+        showStatus(
+          'Mac woke from sleep. Audio routes were refreshed; start capture explicitly.',
+        );
+      }
+    });
   });
 
   // ---- settings ----------------------------------------------------------

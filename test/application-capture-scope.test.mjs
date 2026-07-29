@@ -375,6 +375,42 @@ describe('ApplicationCaptureScopeCoordinator', () => {
     });
   });
 
+  it('invalidates selected and in-flight inventory across a power lifecycle boundary', async () => {
+    const pending = deferred();
+    let refreshImplementation = () => pending.promise;
+    const inventoryClient = {
+      refresh: (generation) => refreshImplementation(generation),
+    };
+    const coordinator = new ApplicationCaptureScopeCoordinator({ inventoryClient });
+    const refresh = coordinator.refresh();
+
+    coordinator.invalidate();
+    const event = inventoryEvent();
+    event.generation = 1;
+    pending.resolve(validateApplicationInventory(event, 1));
+    await expect(refresh).rejects.toEqual(
+      new ApplicationCaptureScopeError('stale-application-inventory'),
+    );
+    expect(() => coordinator.captureConfiguration()).toThrow(
+      new ApplicationCaptureScopeError('application-selection-required'),
+    );
+
+    refreshImplementation = async (generation) => {
+      const next = inventoryEvent();
+      next.generation = generation;
+      return validateApplicationInventory(next, generation);
+    };
+    await expect(coordinator.refresh()).resolves.toMatchObject({
+      inventory: { generation: 3 },
+      requestedScope: null,
+    });
+    coordinator.select(selection({ inventoryGeneration: 3 }));
+    coordinator.invalidate();
+    expect(() => coordinator.captureConfiguration()).toThrow(
+      new ApplicationCaptureScopeError('application-selection-required'),
+    );
+  });
+
   it('fails closed when capture is active before or during inventory refresh', async () => {
     let captureActive = true;
     const pending = deferred();

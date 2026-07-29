@@ -51,16 +51,26 @@ export class ApplicationCaptureScopeCoordinator {
     }
     this.#refreshing = true;
     this.#generation += 1;
+    const generation = this.#generation;
     this.#inventory = null;
     this.#requestedScope = null;
     try {
-      const inventory = await this.#inventoryClient.refresh(this.#generation);
+      const inventory = await this.#inventoryClient.refresh(generation);
       this.#requireCaptureIdle();
+      if (generation !== this.#generation) {
+        throw new ApplicationCaptureScopeError('stale-application-inventory');
+      }
       this.#inventory = inventory;
       return { inventory, requestedScope: null };
     } finally {
       this.#refreshing = false;
     }
+  }
+
+  invalidate() {
+    this.#generation += 1;
+    this.#inventory = null;
+    this.#requestedScope = null;
   }
 
   select(selection) {

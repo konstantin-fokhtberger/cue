@@ -1,5 +1,14 @@
 const DEBUG = false; // Set to false to disable debug logging
-const { app, BrowserWindow, ipcMain, globalShortcut, screen, session, shell } = require('electron');
+const {
+  app,
+  BrowserWindow,
+  ipcMain,
+  globalShortcut,
+  powerMonitor,
+  screen,
+  session,
+  shell,
+} = require('electron');
 const { resolveE2eRuntime } = require('./src/core/e2e-runtime-policy.cjs');
 const e2eRuntime = resolveE2eRuntime({
   enabled: process.env.CUE_E2E,
@@ -391,6 +400,16 @@ app.whenReady().then(async () => {
   applicationCaptureScopeCoordinator = new ApplicationCaptureScopeCoordinator({
     inventoryClient: new NativeApplicationInventory({ helperPath }),
     isCaptureActive: () => state.capturing,
+  });
+  powerMonitor.on('suspend', () => {
+    const captureWasActive = state.capturing;
+    applicationCaptureScopeCoordinator.invalidate();
+    if (captureWasActive) setCapturing(false);
+    send('power:state', { status: 'suspended', captureWasActive });
+  });
+  powerMonitor.on('resume', () => {
+    applicationCaptureScopeCoordinator.invalidate();
+    send('power:state', { status: 'resumed' });
   });
 
   createWindow();

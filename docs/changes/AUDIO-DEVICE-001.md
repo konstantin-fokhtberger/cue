@@ -2,13 +2,13 @@
 
 ## Control
 
-| Field           | Value                                                  |
-| --------------- | ------------------------------------------------------ |
-| Backlog ID      | AUDIO-DEVICE-001                                       |
-| Requirement IDs | FR-AUDIO-001, FR-AUDIO-007, FR-AUDIO-008, FR-AUDIO-009 |
-| Status          | in progress                                            |
-| Owner           | project maintainer                                     |
-| Target revision | after ADR-005 acceptance                               |
+| Field           | Value                                                                  |
+| --------------- | ---------------------------------------------------------------------- |
+| Backlog ID      | AUDIO-DEVICE-001                                                       |
+| Requirement IDs | FR-AUDIO-001, FR-AUDIO-007, FR-AUDIO-008, FR-AUDIO-009, FR-SESSION-006 |
+| Status          | verified                                                               |
+| Owner           | project maintainer                                                     |
+| Target revision | after ADR-005 acceptance                                               |
 
 ## Outcome
 
@@ -48,19 +48,25 @@ Teams и Google Meet. Пользователь должен явно видет�
    requested input и cue effective input.
 7. Выбор cue output применяет exact sink, сохраняется и отображает effective sink.
 8. UI явно сообщает, что meeting-app output выбирается отдельно.
+9. При suspend активные microphone/system/diagnostic resources останавливаются fail-closed.
+10. После resume cue обновляет device/application inventory, не возобновляет capture молча и
+    требует нового явного Start.
 
 ## Test plan
 
-| Level       | Test ID                          | Purpose                                             |
-| ----------- | -------------------------------- | --------------------------------------------------- |
-| Unit        | UT-AUDIO-DEVICE-POLICY-001       | Explicit selection and default fallback             |
-| Contract    | CT-AUDIO-DEVICE-POLICY-001       | Exact device constraints and no silent swap         |
-| Contract    | CT-AUDIO-OUTPUT-POLICY-001       | Exact cue playback sink and default fallback        |
-| E2E         | E2E-AUDIO-DEVICE-SELECT-001      | Selector and effective-device presentation          |
-| E2E         | E2E-AUDIO-DEVICE-OUTPUT-LOSS-001 | Output loss is fail-closed and exact route recovers |
-| Real device | RT-MAC-APP-OVERRIDE-001          | macOS Sony, meeting app HyperX, cue HyperX          |
-| Real device | RT-MAC-DEVICE-LOSS-001           | Sony disconnect/reconnect without fallback          |
-| Mutation    | MT-AUDIO-DEVICE-POLICY-001       | Fallback and mismatch assertion strength            |
+| Level       | Test ID                          | Purpose                                                  |
+| ----------- | -------------------------------- | -------------------------------------------------------- |
+| Unit        | UT-AUDIO-DEVICE-POLICY-001       | Explicit selection and default fallback                  |
+| Contract    | CT-AUDIO-DEVICE-POLICY-001       | Exact device constraints and no silent swap              |
+| Contract    | CT-AUDIO-OUTPUT-POLICY-001       | Exact cue playback sink and default fallback             |
+| E2E         | E2E-AUDIO-DEVICE-SELECT-001      | Selector and effective-device presentation               |
+| E2E         | E2E-AUDIO-DEVICE-OUTPUT-LOSS-001 | Output loss is fail-closed and exact route recovers      |
+| E2E         | E2E-SESSION-SLEEP-WAKE-001       | Suspend stops capture and resume requires explicit Start |
+| E2E         | E2E-AUDIO-DIAG-SLEEP-WAKE-001    | Suspend disposes local diagnostic without stale PCM      |
+| Real device | RT-MAC-APP-OVERRIDE-001          | macOS Sony, meeting app HyperX, cue HyperX               |
+| Real device | RT-MAC-DEVICE-LOSS-001           | Sony disconnect/reconnect without fallback               |
+| Real device | RT-MAC-SLEEP-WAKE-001            | Active HyperX and Sony routes across system sleep        |
+| Mutation    | MT-AUDIO-DEVICE-POLICY-001       | Fallback and mismatch assertion strength                 |
 
 ## Risks
 
@@ -80,8 +86,8 @@ Teams и Google Meet. Пользователь должен явно видет�
   failure, and effective-sink mismatch.
 - Browser capture contract classifies `NotFoundError` and `OverconstrainedError` as
   `device-unavailable`; exact input selection therefore cannot silently degrade to default.
-- Full automated scope after signing-policy work: 100% statements/branches/functions/lines
-  and 653/653 mutants killed.
+- Current automated scope: 291 unit/contract tests at 100% statements, branches, functions and
+  lines; mutation score 100% with 1,651 killed, 4 timed out and 0 survived.
 - Development Electron UI smoke test displayed independent Input and Output selectors,
   requested/effective status, and the explicit warning that meeting-app devices are separate.
 - Stable team-signed target package enumerated the real CoreAudio inventory. Explicit HyperX
@@ -99,8 +105,20 @@ Teams и Google Meet. Пользователь должен явно видет�
   retained explicit HyperX input and Sony output. cue rendered the missing output as
   `Unavailable device`, refused the output test with `selected sink is unavailable`, did not
   offer a silent fallback, then restored exact `.Sony (Bluetooth)` after reconnection.
-- Sleep/wake recovery remains open and is intentionally a separate target-Mac acceptance
-  because suspending the machine interrupts the current control session.
+- `E2E-SESSION-SLEEP-WAKE-001` injects Electron suspend/resume events at the real main-process
+  boundary. Suspend stops microphone and native helper resources, resume refreshes inventory
+  without auto-restart, and a new explicit Start creates and releases a new exact generation.
+- `E2E-AUDIO-DIAG-SLEEP-WAKE-001` verifies the same fail-closed lifecycle for local diagnostic
+  tracks/worklets and exact Sony output revalidation.
+- `RT-MAC-SLEEP-WAKE-001` on the signed target package entered Software Sleep at
+  `2026-07-29 21:19:25 +0500` and FullWake at `21:19:31`. Active HyperX diagnostics stopped,
+  cue displayed the explicit wake/revalidation message, preserved HyperX/Sony selections,
+  reopened HyperX to 1,241 frames after an explicit restart and applied the Sony test tone
+  without typed failure.
+- A real active application-scoped helper was not available in this final cycle because the
+  post-wake inventory contained no currently audible application. Its suspend/restart
+  lifecycle is covered by packaged E2E against the real main/renderer/helper orchestration;
+  prior target-Mac Chrome and Zoom runs cover normal helper capture.
 
 ## Escaped-defect analysis: stale output sink after disconnect
 
@@ -115,3 +133,18 @@ Teams и Google Meet. Пользователь должен явно видет�
 - Regression model: `E2E-AUDIO-DEVICE-OUTPUT-LOSS-001` removes Sony from the runtime inventory,
   asserts zero new sink selection and zero playback, verifies typed failure, restores Sony and
   confirms the exact route is reapplied.
+
+## Escaped-defect analysis: stale capture after sleep
+
+- Observation: before the fix, an active HyperX diagnostic entered real Software Sleep with
+  119 frames and returned with only 140. The stream no longer advanced, while cue eventually
+  rendered an ordinary `Stopped` state without reporting suspend or degraded recovery.
+- Root cause: cue did not subscribe to Electron `powerMonitor`; existing browser and native
+  resources therefore remained logically active across a platform boundary that invalidates
+  their device/process assumptions.
+- Correction: suspend now stops capture fail-closed and invalidates the application inventory.
+  Resume refreshes input/output and application inventories, emits an observable UI status and
+  never restarts capture without a new user action.
+- Regression model: deterministic Electron power events verify diagnostic cleanup, native
+  helper/microphone cleanup, stale-inventory rejection, no automatic restart and a clean new
+  generation after explicit Start.

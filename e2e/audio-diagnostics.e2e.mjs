@@ -643,6 +643,63 @@ test('E2E-AUDIO-DIAG-MANUAL-STOP-001 stops once without restarting the microphon
   }
 });
 
+test('E2E-AUDIO-DIAG-SLEEP-WAKE-001 disposes diagnostics and revalidates routes', async () => {
+  const fixture = await launchCue('healthy');
+  try {
+    await fixture.page.locator('#audio-input').selectOption('hyperx');
+    await fixture.page.locator('#audio-output').selectOption('sony');
+    const microphoneButton = fixture.page.locator('#audio-test-input');
+    await microphoneButton.click();
+    await fixture.page
+      .locator('#audio-diagnostic-status')
+      .filter({ hasText: 'Signal detected · input: HyperX SoloCast (fixture)' })
+      .waitFor();
+
+    await fixture.electronApp.evaluate(({ powerMonitor }) => powerMonitor.emit('suspend'));
+    await fixture.page
+      .locator('#cue-status')
+      .filter({ hasText: 'Mac is sleeping. Audio capture stopped.' })
+      .waitFor();
+    await fixture.page
+      .locator('#audio-diagnostic-status')
+      .filter({ hasText: 'Stopped · input: HyperX SoloCast (fixture)' })
+      .waitFor();
+    let state = await fixture.page.evaluate(() => window.__cueE2eAudio);
+    assert.equal(state.microphoneOpenCount, 1);
+    assert.equal(state.stoppedTrackCount, 1);
+    assert.equal(state.activeWorkletCount, 0);
+
+    await fixture.electronApp.evaluate(({ powerMonitor }) => powerMonitor.emit('resume'));
+    await fixture.page
+      .locator('#cue-status')
+      .filter({
+        hasText: 'Mac woke from sleep. Audio routes were refreshed; start capture explicitly.',
+      })
+      .waitFor();
+    await fixture.page
+      .locator('#audio-output-effective')
+      .filter({ hasText: 'Effective: Sony Bluetooth (fixture)' })
+      .waitFor();
+    assert.equal(await microphoneButton.textContent(), 'Test selected microphone');
+    state = await fixture.page.evaluate(() => window.__cueE2eAudio);
+    assert.equal(state.microphoneOpenCount, 1);
+
+    await microphoneButton.click();
+    await fixture.page
+      .locator('#audio-diagnostic-status')
+      .filter({ hasText: 'Signal detected · input: HyperX SoloCast (fixture)' })
+      .waitFor();
+    await microphoneButton.click();
+    state = await fixture.page.evaluate(() => window.__cueE2eAudio);
+    assert.equal(state.microphoneOpenCount, 2);
+    assert.equal(state.stoppedTrackCount, 2);
+    assert.equal(state.activeWorkletCount, 0);
+    assert.deepEqual(fixture.networkRequests, []);
+  } finally {
+    await fixture.close();
+  }
+});
+
 test('E2E-AUDIO-DIAG-DENY-001 reports typed permission denial locally', async () => {
   const fixture = await launchCue('permission-denied');
   try {
@@ -765,6 +822,77 @@ test(
       assert.equal(state.trackStopCallCount, 1);
       assert.equal(state.postStopPcmCount, 0);
       assert.deepEqual(await fixture.helperEvents(), ['start', 'stop']);
+      assert.deepEqual(fixture.networkRequests, []);
+    } finally {
+      await fixture.close();
+    }
+  },
+);
+
+test(
+  'E2E-SESSION-SLEEP-WAKE-001 stops capture and requires an explicit restart',
+  { timeout: 30_000 },
+  async () => {
+    const fixture = await launchCue('healthy');
+    try {
+      await fixture.page.locator('#s-close').click();
+      await fixture.page.locator('#stop-btn').click();
+      await fixture.page.waitForFunction(() => window.__cueE2eAudio.microphoneOpenCount === 1);
+      await waitForHelperEventCount(fixture, 1);
+
+      await fixture.electronApp.evaluate(({ powerMonitor }) => powerMonitor.emit('suspend'));
+      await fixture.page
+        .locator('#cue-status')
+        .filter({ hasText: 'Mac is sleeping. Audio capture stopped.' })
+        .waitFor();
+      await fixture.page.waitForFunction(
+        () =>
+          window.__cueE2eAudio.closedContextCount === 1 &&
+          window.__cueE2eAudio.stoppedTrackCount === 1,
+      );
+      await waitForHelperEventCount(fixture, 2);
+      assert.equal(
+        await fixture.page
+          .locator('#stop-btn')
+          .evaluate((button) => button.classList.contains('active')),
+        false,
+      );
+
+      await fixture.electronApp.evaluate(({ powerMonitor }) => powerMonitor.emit('resume'));
+      await fixture.page.waitForFunction(
+        () =>
+          document.querySelector('#cue-status')?.textContent ===
+          'Mac woke from sleep. Audio routes were refreshed; start capture explicitly.',
+      );
+      await fixture.page.waitForFunction(() =>
+        document
+          .querySelector('#capture-application-status')
+          ?.textContent.includes('Select one application.'),
+      );
+      let state = await fixture.page.evaluate(() => window.__cueE2eAudio);
+      assert.equal(state.microphoneOpenCount, 1);
+      assert.deepEqual(await fixture.helperEvents(), ['start', 'stop']);
+
+      await fixture.page.locator('#more-btn').click();
+      await fixture.page.waitForFunction(
+        () =>
+          !document
+            .querySelector('#capture-application-status')
+            ?.textContent.includes('Detecting audible applications'),
+      );
+      const application = fixture.page.locator('#capture-application');
+      await application.locator('option', { hasText: 'zoom.us' }).waitFor({ state: 'attached' });
+      await application.selectOption({ label: 'zoom.us' });
+      await fixture.page.locator('#s-close').click();
+      await fixture.page.locator('#stop-btn').click();
+      await fixture.page.waitForFunction(() => window.__cueE2eAudio.microphoneOpenCount === 2);
+      await waitForHelperEventCount(fixture, 3);
+      await fixture.page.locator('#stop-btn').click();
+      await waitForHelperEventCount(fixture, 4);
+
+      state = await fixture.page.evaluate(() => window.__cueE2eAudio);
+      assert.equal(state.stoppedTrackCount, 2);
+      assert.deepEqual(await fixture.helperEvents(), ['start', 'stop', 'start', 'stop']);
       assert.deepEqual(fixture.networkRequests, []);
     } finally {
       await fixture.close();

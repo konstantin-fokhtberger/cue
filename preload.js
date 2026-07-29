@@ -19,6 +19,7 @@ contextBridge.exposeInMainWorld('cue', {
   on: (channel, cb) => {
     const allowed = [
       'capture:state',
+      'power:state',
       'system-capture:state',
       'llm:start',
       'llm:token',
