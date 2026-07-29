@@ -85,5 +85,11 @@ jobs:
             sleep "$delay_seconds"
           done
 
-      - name: Package unsigned macOS application
-        run: npm run pack
+      - name: Run native Swift structural and mutation gates
+        run: npm run test:swift && npm run test:swift:mutation
+
+      - name: Package and verify ad-hoc macOS application
+        run: npm run pack:ci
+
+      - name: Run packaged Electron audio diagnostics E2E
+        run: npm run test:e2e:packaged

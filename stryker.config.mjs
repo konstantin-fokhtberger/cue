@@ -7,6 +7,7 @@ const config = {
     'out',
     'coverage',
     'reports',
+    'native/audio-tap-helper/.build',
     '.obsidian',
     'docs/.obsidian',
   ],

@@ -23,14 +23,18 @@
 
 ### Audio capture
 
-| ID           | Priority | Status   | Requirement                                                         | Acceptance criteria                                                                                 |
-| ------------ | -------: | -------- | ------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------- |
-| FR-AUDIO-001 |       P0 | accepted | Capture the user's microphone as a dedicated channel                | Frames are tagged `microphone` and never merged before transcription policy applies                 |
-| FR-AUDIO-002 |       P0 | accepted | Capture meeting/system audio as a dedicated channel                 | Remote audio is captured from Zoom, Teams, and Meet on the target Mac                               |
-| FR-AUDIO-003 |       P0 | accepted | Exclude cue's own generated audio where supported                   | Test playback from cue does not re-enter the remote transcript path                                 |
-| FR-AUDIO-004 |       P0 | accepted | Detect a dead or silent system stream                               | Health check transitions the session to degraded/error state instead of showing false active status |
-| FR-AUDIO-005 |       P1 | accepted | Audio buffers are bounded                                           | Backpressure and overflow behavior are deterministic and tested                                     |
-| FR-AUDIO-006 |       P1 | accepted | Bluetooth and built-in audio routes are supported on the target Mac | The accepted device matrix passes                                                                   |
+| ID           | Priority | Status   | Requirement                                                         | Acceptance criteria                                                                                                                                                                                                 |
+| ------------ | -------: | -------- | ------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| FR-AUDIO-001 |       P0 | accepted | Capture the user's microphone as a dedicated channel                | Frames are tagged `microphone` and never merged before transcription policy applies                                                                                                                                 |
+| FR-AUDIO-002 |       P0 | accepted | Capture meeting/system audio as a dedicated channel                 | Remote audio is captured from Zoom, Teams, and Meet on the target Mac                                                                                                                                               |
+| FR-AUDIO-003 |       P0 | accepted | Exclude cue's own generated audio where supported                   | Test playback from cue does not re-enter the remote transcript path                                                                                                                                                 |
+| FR-AUDIO-004 |       P0 | accepted | Detect a dead or silent system stream                               | Health check transitions the session to degraded/error state instead of showing false active status                                                                                                                 |
+| FR-AUDIO-005 |       P1 | accepted | Audio buffers are bounded                                           | Backpressure and overflow behavior are deterministic and tested                                                                                                                                                     |
+| FR-AUDIO-006 |       P1 | accepted | Bluetooth and built-in audio routes are supported on the target Mac | The accepted device matrix passes                                                                                                                                                                                   |
+| FR-AUDIO-007 |       P1 | accepted | A separate USB microphone works with Bluetooth output               | HyperX SoloCast input and Sony Bluetooth output retain separate microphone/system PCM and pass the accepted meeting-app matrix                                                                                      |
+| FR-AUDIO-008 |       P0 | accepted | cue selects and reports its microphone independently                | With macOS default input set to Sony and the meeting app set to HyperX, cue can explicitly open HyperX and reports the effective device; without an explicit selection, the displayed fallback is the macOS default |
+| FR-AUDIO-009 |       P0 | accepted | cue selects and reports its playback output independently           | cue applies the exact selected output sink to cue-owned playback, displays requested/effective output, and states that meeting-app output must be selected separately                                               |
+| FR-AUDIO-010 |       P0 | accepted | cue captures system audio from an explicit application scope        | Production STT accepts system PCM only from the requested and verified application scope; missing or ambiguous scope never falls back to the global mix                                                             |
 
 ### Transcription and diarization
 
@@ -54,6 +58,13 @@
 | FR-MEET-004 |       P1 | accepted | Rename speaker labels                      | Renaming updates presentation without rewriting raw transcript evidence                     |
 | FR-MEET-005 |       P1 | accepted | Show what data is being attached           | Before dispatch, the UI identifies transcript, screen, and professional context attachments |
 
+### macOS application shell
+
+| ID           | Priority | Status   | Requirement                                                      | Acceptance criteria                                                                                                                                              |
+| ------------ | -------: | -------- | ---------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| FR-SHELL-001 |       P1 | accepted | The user can reposition the overlay by dragging its upper area   | A dedicated non-interactive drag region moves the frameless window within one display and between connected displays without intercepting adjacent controls      |
+| FR-SHELL-002 |       P1 | accepted | The app exposes a macOS menu bar status item with an exit action | While cue is running, its status item is visible; selecting `Close app` performs graceful application shutdown and releases active capture resources and helpers |
+
 ### Interview and coding profiles
 
 | ID          | Priority | Status   | Requirement                                               | Acceptance criteria                                                              |
@@ -65,44 +76,69 @@
 
 ### Privacy and provider control
 
-| ID          | Priority | Status   | Requirement                                 | Acceptance criteria                                                                         |
-| ----------- | -------: | -------- | ------------------------------------------- | ------------------------------------------------------------------------------------------- |
-| FR-PRIV-001 |       P0 | accepted | Store API keys in macOS Keychain            | No provider secret appears in application JSON, logs, fixtures, or renderer state           |
-| FR-PRIV-002 |       P0 | accepted | Display active capture and provider state   | The user can always determine whether capture is active and where data is sent              |
-| FR-PRIV-003 |       P0 | accepted | Apply explicit retention policy per session | Raw audio is never persisted and transcript exists only in active-session memory            |
-| FR-PRIV-004 |       P1 | accepted | Clear session data on request               | Clear operation removes all locally retained artifacts and reports completion               |
-| FR-PRIV-005 |       P1 | accepted | Sanitize provider errors                    | Error UI and logs contain no keys, raw requests, audio, transcript, or professional context |
+| ID          | Priority | Status   | Requirement                                             | Acceptance criteria                                                                                                                      |
+| ----------- | -------: | -------- | ------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
+| FR-PRIV-001 |       P0 | accepted | Store API keys in macOS Keychain                        | No provider secret appears in application JSON, logs, fixtures, or renderer state                                                        |
+| FR-PRIV-002 |       P0 | accepted | Display active capture and provider state               | The user can always determine whether capture is active and where data is sent                                                           |
+| FR-PRIV-003 |       P0 | accepted | Apply explicit retention policy per session             | Raw audio is never persisted and transcript exists only in active-session memory                                                         |
+| FR-PRIV-004 |       P1 | accepted | Clear session data on request                           | Clear operation removes all locally retained artifacts and reports completion                                                            |
+| FR-PRIV-005 |       P1 | accepted | Sanitize provider errors                                | Error UI and logs contain no keys, raw requests, audio, transcript, or professional context                                              |
+| FR-PRIV-006 |       P0 | accepted | Request capture permissions only for the active feature | Meeting audio never requests screen capture; screen permission is requested only after explicit screen/coding invocation                 |
+| FR-PRIV-007 |       P0 | accepted | Prevent unrelated application audio from reaching STT   | Global diagnostic capture cannot dispatch to a provider; browser-wide scope requires an explicit accurate label and user acknowledgement |
 
 ## 3. Non-functional requirements
 
-| ID           | Priority | Status   | Requirement                                                     | Accepted measure                                                                       |
-| ------------ | -------: | -------- | --------------------------------------------------------------- | -------------------------------------------------------------------------------------- |
-| NFR-REL-001  |       P0 | accepted | Capture lifecycle must be deterministic                         | 100 consecutive automated Start/Stop cycles without leaked streams or duplicate events |
-| NFR-REL-002  |       P0 | accepted | Session isolation must hold under concurrency                   | Race, delayed callback, retry, and cancellation suites pass                            |
-| NFR-TEST-001 |       P0 | accepted | Project-owned production logic has complete structural coverage | 100% lines, statements, functions, and branches                                        |
-| NFR-TEST-002 |       P0 | accepted | Critical behavior resists weak assertions                       | 100% mutation score for lifecycle, routing, retention, and timeline modules            |
-| NFR-TEST-003 |       P0 | accepted | Every P0/P1 requirement is automated                            | Traceability contains no accepted P0/P1 requirement without a passing test reference   |
-| NFR-SEC-001  |       P0 | accepted | Renderer cannot exercise ambient privileged APIs                | Narrow IPC contracts, sender checks, schemas, bounds, and negative tests               |
-| NFR-SEC-002  |       P0 | accepted | Distributed build has stable identity                           | Signed and notarized package passes Gatekeeper verification                            |
-| NFR-PERF-001 |       P1 | accepted | Stop latency remains bounded                                    | p95 <= 500 ms on the target Mac                                                        |
-| NFR-PERF-002 |       P1 | accepted | Partial transcript is timely                                    | p95 <= 2 seconds after speech boundary                                                 |
-| NFR-PERF-003 |       P1 | accepted | Reply suggestion is timely                                      | First token p95 <= 3 seconds after explicit request, excluding provider outage         |
-| NFR-RES-001  |       P1 | accepted | Memory use is bounded for long meetings                         | Four-hour synthetic session remains under an accepted RSS growth limit                 |
-| NFR-OBS-001  |       P1 | accepted | Failures are diagnosable without exposing sensitive data        | Structured local events cover state transitions, provider timing, and sanitized errors |
-| NFR-COMP-001 |       P0 | accepted | First release supports only the specified personal Mac          | No broader compatibility claim without explicit test evidence                          |
+| ID           | Priority | Status   | Requirement                                                     | Accepted measure                                                                                                                    |
+| ------------ | -------: | -------- | --------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------- |
+| NFR-REL-001  |       P0 | accepted | Capture lifecycle must be deterministic                         | 100 consecutive automated Start/Stop cycles without leaked streams or duplicate events                                              |
+| NFR-REL-002  |       P0 | accepted | Session isolation must hold under concurrency                   | Race, delayed callback, retry, and cancellation suites pass                                                                         |
+| NFR-TEST-001 |       P0 | accepted | Project-owned production logic has complete structural coverage | 100% lines, statements, functions, and branches                                                                                     |
+| NFR-TEST-002 |       P0 | accepted | Critical behavior resists weak assertions                       | 100% mutation score for lifecycle, routing, retention, and timeline modules                                                         |
+| NFR-TEST-003 |       P0 | accepted | Every P0/P1 requirement is automated                            | Traceability contains no accepted P0/P1 requirement without a passing test reference                                                |
+| NFR-SEC-001  |       P0 | accepted | Renderer cannot exercise ambient privileged APIs                | Narrow IPC contracts, sender checks, schemas, bounds, and negative tests                                                            |
+| NFR-SEC-002  |       P0 | accepted | Distributed build has stable identity                           | Signed and notarized package passes Gatekeeper verification                                                                         |
+| NFR-SEC-003  |       P0 | accepted | Target-Mac test builds retain a stable TCC identity             | Consecutive local packages have `Identifier=com.cue.overlay`, the same non-empty TeamIdentifier and the same designated requirement |
+| NFR-PERF-001 |       P1 | accepted | Stop latency remains bounded                                    | p95 <= 500 ms on the target Mac                                                                                                     |
+| NFR-PERF-002 |       P1 | accepted | Partial transcript is timely                                    | p95 <= 2 seconds after speech boundary                                                                                              |
+| NFR-PERF-003 |       P1 | accepted | Reply suggestion is timely                                      | First token p95 <= 3 seconds after explicit request, excluding provider outage                                                      |
+| NFR-RES-001  |       P1 | accepted | Memory use is bounded for long meetings                         | Four-hour synthetic session remains under an accepted RSS growth limit                                                              |
+| NFR-OBS-001  |       P1 | accepted | Failures are diagnosable without exposing sensitive data        | Structured local events cover state transitions, provider timing, and sanitized errors                                              |
+| NFR-COMP-001 |       P0 | accepted | First release supports only the specified personal Mac          | No broader compatibility claim without explicit test evidence                                                                       |
 
 ## 4. Acceptance test matrix
 
 The first audio feasibility gate must cover:
 
-| Meeting app     | Output route          |   Participants | Required evidence                             |
-| --------------- | --------------------- | -------------: | --------------------------------------------- |
-| Zoom            | Built-in speakers/mic | 2 and multiple | Separate mic/system capture, transcript, Stop |
-| Zoom            | Bluetooth headset     | 2 and multiple | Route stability and recovery                  |
-| Microsoft Teams | Built-in speakers/mic | 2 and multiple | Separate mic/system capture, transcript, Stop |
-| Microsoft Teams | Bluetooth headset     | 2 and multiple | Route stability and recovery                  |
-| Google Meet     | Built-in speakers/mic | 2 and multiple | Separate mic/system capture, transcript, Stop |
-| Google Meet     | Bluetooth headset     | 2 and multiple | Route stability and recovery                  |
+| Meeting app     | Device scenario            |   Participants | Required evidence                             |
+| --------------- | -------------------------- | -------------: | --------------------------------------------- |
+| Zoom            | Built-in speakers/mic      | 2 and multiple | Separate mic/system capture, transcript, Stop |
+| Zoom            | Bluetooth headset          | 2 and multiple | Route stability and recovery                  |
+| Zoom            | USB mic + Bluetooth output | 2 and multiple | Separate channels, route stability, Stop      |
+| Microsoft Teams | Built-in speakers/mic      | 2 and multiple | Separate mic/system capture, transcript, Stop |
+| Microsoft Teams | Bluetooth headset          | 2 and multiple | Route stability and recovery                  |
+| Microsoft Teams | USB mic + Bluetooth output | 2 and multiple | Separate channels, route stability, Stop      |
+| Google Meet     | Built-in speakers/mic      | 2 and multiple | Separate mic/system capture, transcript, Stop |
+| Google Meet     | Bluetooth headset          | 2 and multiple | Route stability and recovery                  |
+| Google Meet     | USB mic + Bluetooth output | 2 and multiple | Separate channels, route stability, Stop      |
+
+Each row is executed with two configuration variants:
+
+1. `aligned` - macOS defaults, meeting-app selections, and cue selection refer to the expected
+   devices.
+2. `app override` - macOS defaults remain Sony input/output, the meeting app selects HyperX
+   input and Sony output, and cue explicitly selects HyperX.
+
+Every real-device result records these fields independently:
+
+- macOS default input and output;
+- meeting-app selected input and output;
+- cue requested microphone and cue effective microphone track;
+- cue requested playback output and cue effective playback sink;
+- effective system-audio track;
+- whether each value was observed automatically, verified manually, or remains unknown.
+
+An unobserved meeting-app selection must be reported as `unknown`; it cannot be inferred from
+the macOS default or cue's track label.
 
 ## 5. Deferred refinements
 

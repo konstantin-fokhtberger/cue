@@ -9,6 +9,7 @@ const DEFAULTS = {
   provider: 'openai',
   smart: false,
   resumeContext: '',
+  audioDevices: { inputId: 'default', outputId: 'default' },
   shortcuts: { assist: 'CommandOrControl+Return' },
   apiKeys: { openai: '', anthropic: '', gemini: '', deepgram: '', nvidia: '' },
   models: {

@@ -1,0 +1,1117 @@
+import CueAudioTapCore
+import Foundation
+import XCTest
+
+private enum FixtureError: Error, CustomStringConvertible {
+  case failed(String)
+
+  var description: String {
+    switch self {
+    case .failed(let value): value
+    }
+  }
+}
+
+private final class FakePlatform: AudioTapPlatform {
+  enum Operation: String {
+    case createTap
+    case tapUID
+    case tapFormat
+    case outputDevices
+    case createAggregate
+    case createIO
+    case startIO
+  }
+
+  var failingOperation: Operation?
+  var uid = "tap-uid"
+  var format = TapFormat(
+    isLinearPCM: true,
+    isFloat: true,
+    bitsPerChannel: 32,
+    channelsPerFrame: 1,
+    sampleRate: 48_000
+  )
+  var outputDeviceUIDs = ["output-a", "output-b"]
+  var verifiedScopeOverride: VerifiedApplicationScope?
+  var operations = [String]()
+  var payloadHandler: ((AudioPayload) -> Void)?
+
+  func createTap() throws -> UInt32 {
+    operations.append(Operation.createTap.rawValue)
+    try failIfRequested(.createTap)
+    return 11
+  }
+
+  func createApplicationTap(processObjectIDs: [UInt32]) throws -> UInt32 {
+    operations.append(
+      "createApplicationTap:\(processObjectIDs.map(String.init).joined(separator: ","))"
+    )
+    try failIfRequested(.createTap)
+    return 11
+  }
+
+  func verifyApplicationScope(
+    _ selection: ApplicationScopeSelection
+  ) throws -> VerifiedApplicationScope {
+    operations.append("verifyApplicationScope:\(selection.responsiblePID)")
+    return verifiedScopeOverride
+      ?? VerifiedApplicationScope(
+        inventoryGeneration: selection.inventoryGeneration,
+        identity: ResponsibleApplicationIdentity(
+          pid: selection.responsiblePID,
+          bundleIdentifier: selection.bundleIdentifier,
+          displayName: "Selected app"
+        ),
+        audioProcessObjectIDs: [101],
+        outputDeviceUIDs: outputDeviceUIDs
+      )
+  }
+
+  func tapUID(for tapID: UInt32) throws -> String {
+    operations.append("\(Operation.tapUID.rawValue):\(tapID)")
+    try failIfRequested(.tapUID)
+    return uid
+  }
+
+  func tapFormat(for tapID: UInt32) throws -> TapFormat {
+    operations.append("\(Operation.tapFormat.rawValue):\(tapID)")
+    try failIfRequested(.tapFormat)
+    return format
+  }
+
+  func runningOutputDeviceUIDs() throws -> [String] {
+    operations.append(Operation.outputDevices.rawValue)
+    try failIfRequested(.outputDevices)
+    return outputDeviceUIDs
+  }
+
+  func createAggregate(tapUID: String, outputDeviceUIDs: [String]) throws -> UInt32 {
+    operations.append(
+      "\(Operation.createAggregate.rawValue):\(tapUID):\(outputDeviceUIDs.joined(separator: ","))"
+    )
+    try failIfRequested(.createAggregate)
+    return 22
+  }
+
+  func createIO(
+    aggregateID: UInt32,
+    onPayload: @escaping (AudioPayload) -> Void
+  ) throws {
+    operations.append("\(Operation.createIO.rawValue):\(aggregateID)")
+    try failIfRequested(.createIO)
+    payloadHandler = onPayload
+  }
+
+  func startIO(aggregateID: UInt32) throws {
+    operations.append("\(Operation.startIO.rawValue):\(aggregateID)")
+    try failIfRequested(.startIO)
+  }
+
+  func stopIO(aggregateID: UInt32) {
+    operations.append("stopIO:\(aggregateID)")
+  }
+
+  func destroyIO(aggregateID: UInt32) {
+    operations.append("destroyIO:\(aggregateID)")
+    payloadHandler = nil
+  }
+
+  func destroyAggregate(_ aggregateID: UInt32) {
+    operations.append("destroyAggregate:\(aggregateID)")
+  }
+
+  func destroyTap(_ tapID: UInt32) {
+    operations.append("destroyTap:\(tapID)")
+  }
+
+  private func failIfRequested(_ operation: Operation) throws {
+    if failingOperation == operation {
+      throw FixtureError.failed(operation.rawValue)
+    }
+  }
+}
+
+private final class FakeSession: AudioSession {
+  var sampleRate = 48_000.0
+  var startError: Error?
+  var snapshotValue = SignalSnapshot(callbacks: 1, samples: 2, nonzero: 1, peak: 0.5)
+  var operations = [String]()
+
+  func start() throws -> Double {
+    operations.append("start")
+    if let startError {
+      throw startError
+    }
+    return sampleRate
+  }
+
+  func start(scope: CaptureScope) throws -> CaptureStart {
+    let sampleRate = try start()
+    let effectiveScope: EffectiveCaptureScope
+    switch scope {
+    case .diagnosticGlobal:
+      effectiveScope = .diagnosticGlobal
+    case .application(let selection):
+      effectiveScope = .application(
+        VerifiedApplicationScope(
+          inventoryGeneration: selection.inventoryGeneration,
+          identity: ResponsibleApplicationIdentity(
+            pid: selection.responsiblePID,
+            bundleIdentifier: selection.bundleIdentifier,
+            displayName: "Selected app"
+          ),
+          audioProcessObjectIDs: [101],
+          outputDeviceUIDs: ["output-a"]
+        )
+      )
+    }
+    return CaptureStart(sampleRate: sampleRate, scope: effectiveScope)
+  }
+
+  func stop() {
+    operations.append("stop")
+  }
+
+  func scopeIsValid() -> Bool {
+    true
+  }
+
+  func drain() {
+    operations.append("drain")
+  }
+
+  func snapshot() -> SignalSnapshot {
+    operations.append("snapshot")
+    return snapshotValue
+  }
+}
+
+private final class FakeTermination: HelperControlling {
+  var configuration = HelperConfiguration.capture(
+    protocolVersion: 1,
+    scope: .diagnosticGlobal
+  )
+  var configurationError: Error?
+  var waitError: Error?
+  var readCount = 0
+  var waitCount = 0
+
+  func readConfiguration() throws -> HelperConfiguration {
+    readCount += 1
+    if let configurationError {
+      throw configurationError
+    }
+    return configuration
+  }
+
+  func wait() throws {
+    waitCount += 1
+    if let waitError {
+      throw waitError
+    }
+  }
+}
+
+final class HelperErrorTests: XCTestCase {
+  func testDescriptionsAreStableAndSanitized() {
+    XCTAssertEqual(
+      HelperError.operation(name: "create", status: -50).description,
+      "create failed with OSStatus -50"
+    )
+    XCTAssertEqual(
+      HelperError.missingTapUID.description,
+      "The process tap did not expose a UID."
+    )
+    XCTAssertEqual(
+      HelperError.missingOutputDevice.description,
+      "No output device is available for the process tap."
+    )
+    XCTAssertEqual(
+      HelperError.missingAudioProcess.description,
+      "No audio process is available for the application tap."
+    )
+    XCTAssertEqual(
+      HelperError.unsupportedFormat.description,
+      "The tap did not provide mono Float32 linear PCM."
+    )
+    XCTAssertEqual(
+      HelperError.invalidState.description,
+      "The audio tap session is already active."
+    )
+    XCTAssertEqual(
+      HelperError.controlClosed.description,
+      "The helper control channel closed before configuration."
+    )
+    XCTAssertEqual(
+      HelperError.controlMessageTooLarge.description,
+      "The helper control message exceeded its byte limit."
+    )
+    XCTAssertEqual(
+      HelperError.invalidControlMessage.description,
+      "The helper control message is invalid or unsupported."
+    )
+    XCTAssertEqual(
+      HelperError.unexpectedControlData.description,
+      "The helper control channel received unexpected data."
+    )
+    XCTAssertEqual(
+      HelperError.applicationScopeInvalidated.description,
+      "The selected application audio scope is no longer valid."
+    )
+  }
+}
+
+final class TapFormatTests: XCTestCase {
+  private let valid = TapFormat(
+    isLinearPCM: true,
+    isFloat: true,
+    bitsPerChannel: 32,
+    channelsPerFrame: 1,
+    sampleRate: 48_000
+  )
+
+  func testValidFormatReturnsItsSampleRate() throws {
+    XCTAssertEqual(try valid.validatedSampleRate(), 48_000)
+    XCTAssertEqual(valid, valid)
+  }
+
+  func testEveryUnsupportedFormatDimensionIsRejected() {
+    let invalid = [
+      TapFormat(
+        isLinearPCM: false,
+        isFloat: true,
+        bitsPerChannel: 32,
+        channelsPerFrame: 1,
+        sampleRate: 48_000
+      ),
+      TapFormat(
+        isLinearPCM: true,
+        isFloat: false,
+        bitsPerChannel: 32,
+        channelsPerFrame: 1,
+        sampleRate: 48_000
+      ),
+      TapFormat(
+        isLinearPCM: true,
+        isFloat: true,
+        bitsPerChannel: 16,
+        channelsPerFrame: 1,
+        sampleRate: 48_000
+      ),
+      TapFormat(
+        isLinearPCM: true,
+        isFloat: true,
+        bitsPerChannel: 32,
+        channelsPerFrame: 2,
+        sampleRate: 48_000
+      ),
+      TapFormat(
+        isLinearPCM: true,
+        isFloat: true,
+        bitsPerChannel: 32,
+        channelsPerFrame: 1,
+        sampleRate: .infinity
+      ),
+      TapFormat(
+        isLinearPCM: true,
+        isFloat: true,
+        bitsPerChannel: 32,
+        channelsPerFrame: 1,
+        sampleRate: 0
+      ),
+    ]
+
+    for format in invalid {
+      XCTAssertThrowsError(try format.validatedSampleRate()) {
+        XCTAssertEqual($0 as? HelperError, .unsupportedFormat)
+      }
+    }
+  }
+}
+
+final class BoundedSignalWriterTests: XCTestCase {
+  func testFloat32PayloadAnalysisIsExact() throws {
+    let samples: [Float] = [0, -0.25, 0.75, -.infinity]
+    let data = samples.withUnsafeBytes { Data($0) }
+    let payload = try XCTUnwrap(AudioPayload(float32LE: data))
+
+    XCTAssertEqual(payload.data, data)
+    XCTAssertEqual(payload.sampleCount, 4)
+    XCTAssertEqual(payload.nonzeroCount, 3)
+    XCTAssertEqual(payload.peak, .infinity)
+  }
+
+  func testMalformedFloat32PayloadIsRejected() {
+    XCTAssertNil(AudioPayload(float32LE: Data([1, 2, 3])))
+  }
+
+  func testAcceptTracksMetricsPendingBytesAndDeferredWrite() {
+    var scheduled = [() -> Void]()
+    var writes = [Data]()
+    let writer = BoundedSignalWriter(
+      maximumPendingBytes: 4,
+      scheduleWrite: { scheduled.append($0) },
+      write: { writes.append($0) }
+    )
+    let payload = AudioPayload(
+      data: Data([1, 2, 3, 4]),
+      sampleCount: 1,
+      nonzeroCount: 1,
+      peak: 0.75
+    )
+
+    XCTAssertTrue(writer.accept(payload))
+    XCTAssertEqual(writer.currentPendingBytes(), 4)
+    XCTAssertEqual(
+      writer.snapshot(),
+      SignalSnapshot(callbacks: 1, samples: 1, nonzero: 1, peak: 0.75)
+    )
+    XCTAssertTrue(writes.isEmpty)
+
+    scheduled.removeFirst()()
+    XCTAssertEqual(writes, [Data([1, 2, 3, 4])])
+    XCTAssertEqual(writer.currentPendingBytes(), 0)
+  }
+
+  func testOverflowIsRejectedWithoutCorruptingAccounting() {
+    var scheduled = [() -> Void]()
+    let writer = BoundedSignalWriter(
+      maximumPendingBytes: 3,
+      scheduleWrite: { scheduled.append($0) },
+      write: { _ in }
+    )
+    let first = AudioPayload(
+      data: Data([1, 2]),
+      sampleCount: 2,
+      nonzeroCount: 1,
+      peak: 0.25
+    )
+    let rejected = AudioPayload(
+      data: Data([3, 4]),
+      sampleCount: 2,
+      nonzeroCount: 2,
+      peak: 0.5
+    )
+
+    XCTAssertTrue(writer.accept(first))
+    XCTAssertFalse(writer.accept(rejected))
+    XCTAssertEqual(writer.currentPendingBytes(), 2)
+    XCTAssertEqual(
+      writer.snapshot(),
+      SignalSnapshot(callbacks: 2, samples: 4, nonzero: 3, peak: 0.5)
+    )
+
+    scheduled.removeFirst()()
+    XCTAssertEqual(writer.currentPendingBytes(), 0)
+  }
+
+  func testZeroCapacityAcceptsOnlyEmptyPayload() {
+    var scheduled = [() -> Void]()
+    let writer = BoundedSignalWriter(
+      maximumPendingBytes: 0,
+      scheduleWrite: { scheduled.append($0) },
+      write: { _ in }
+    )
+
+    XCTAssertTrue(
+      writer.accept(
+        AudioPayload(data: Data(), sampleCount: 0, nonzeroCount: 0, peak: 0)
+      )
+    )
+    XCTAssertFalse(
+      writer.accept(
+        AudioPayload(data: Data([1]), sampleCount: 0, nonzeroCount: 0, peak: 0)
+      )
+    )
+    scheduled.removeFirst()()
+    XCTAssertEqual(writer.currentPendingBytes(), 0)
+  }
+
+  func testManyAcceptedAndRejectedPayloadsRemainBounded() {
+    var scheduled = [() -> Void]()
+    let writer = BoundedSignalWriter(
+      maximumPendingBytes: 7,
+      scheduleWrite: { scheduled.append($0) },
+      write: { _ in }
+    )
+
+    for length in 0...12 {
+      let accepted = writer.accept(
+        AudioPayload(
+          data: Data(repeating: UInt8(length), count: length),
+          sampleCount: UInt64(length),
+          nonzeroCount: UInt64(length),
+          peak: Float(length)
+        )
+      )
+      XCTAssertEqual(accepted, length <= 7)
+      while !scheduled.isEmpty {
+        scheduled.removeFirst()()
+      }
+      XCTAssertEqual(writer.currentPendingBytes(), 0)
+    }
+  }
+}
+
+final class AudioTapSessionTests: XCTestCase {
+  private func makeHarness(
+    platform: FakePlatform = FakePlatform()
+  ) -> (AudioTapSession, FakePlatform, BoundedSignalWriter, () -> Int) {
+    var drainCount = 0
+    let writer = BoundedSignalWriter(
+      scheduleWrite: { $0() },
+      write: { _ in }
+    )
+    let session = AudioTapSession(
+      platform: platform,
+      writer: writer,
+      drainWrites: { drainCount += 1 }
+    )
+    return (session, platform, writer, { drainCount })
+  }
+
+  func testSuccessfulLifecycleForwardsPayloadAndCleansUpExactlyOnce() throws {
+    let (session, platform, writer, drainCount) = makeHarness()
+
+    XCTAssertTrue(session.scopeIsValid())
+    XCTAssertEqual(try session.start(), 48_000)
+    XCTAssertThrowsError(try session.start()) {
+      XCTAssertEqual($0 as? HelperError, .invalidState)
+    }
+    platform.payloadHandler?(
+      AudioPayload(data: Data([1]), sampleCount: 1, nonzeroCount: 1, peak: 0.5)
+    )
+    XCTAssertEqual(writer.snapshot().callbacks, 1)
+    XCTAssertEqual(session.snapshot(), writer.snapshot())
+
+    session.drain()
+    XCTAssertEqual(drainCount(), 1)
+    session.stop()
+    session.stop()
+
+    XCTAssertEqual(
+      platform.operations,
+      [
+        "createTap",
+        "tapUID:11",
+        "tapFormat:11",
+        "outputDevices",
+        "createAggregate:tap-uid:output-a,output-b",
+        "createIO:22",
+        "startIO:22",
+        "stopIO:22",
+        "destroyIO:22",
+        "destroyAggregate:22",
+        "destroyTap:11",
+      ]
+    )
+  }
+
+  func testExplicitDiagnosticScopeRemainsUnverified() throws {
+    let (session, _, _, _) = makeHarness()
+
+    XCTAssertEqual(
+      try session.start(scope: .diagnosticGlobal),
+      CaptureStart(sampleRate: 48_000, scope: .diagnosticGlobal)
+    )
+    session.stop()
+    XCTAssertTrue(session.scopeIsValid())
+  }
+
+  func testApplicationScopeUsesOnlyVerifiedProcessObjectsAndTheirOutputDevices() throws {
+    let (session, platform, _, _) = makeHarness()
+    let selection = ApplicationScopeSelection(
+      inventoryGeneration: 7,
+      responsiblePID: 2_000,
+      bundleIdentifier: "com.google.Chrome",
+      browserWideAcknowledged: true
+    )
+
+    XCTAssertEqual(
+      try session.start(scope: .application(selection)),
+      CaptureStart(
+        sampleRate: 48_000,
+        scope: .application(
+          VerifiedApplicationScope(
+            inventoryGeneration: 7,
+            identity: ResponsibleApplicationIdentity(
+              pid: 2_000,
+              bundleIdentifier: "com.google.Chrome",
+              displayName: "Selected app"
+            ),
+            audioProcessObjectIDs: [101],
+            outputDeviceUIDs: ["output-a", "output-b"]
+          )
+        )
+      )
+    )
+    XCTAssertFalse(platform.operations.contains("createTap"))
+    XCTAssertFalse(platform.operations.contains("outputDevices"))
+    XCTAssertEqual(
+      Array(platform.operations.prefix(3)),
+      [
+        "verifyApplicationScope:2000",
+        "createApplicationTap:101",
+        "tapUID:11",
+      ]
+    )
+    XCTAssertTrue(session.scopeIsValid())
+    platform.verifiedScopeOverride = VerifiedApplicationScope(
+      inventoryGeneration: 7,
+      identity: ResponsibleApplicationIdentity(
+        pid: 2_001,
+        bundleIdentifier: "com.google.Chrome",
+        displayName: "Selected app"
+      ),
+      audioProcessObjectIDs: [101],
+      outputDeviceUIDs: ["output-a", "output-b"]
+    )
+    XCTAssertFalse(session.scopeIsValid())
+    XCTAssertThrowsError(try session.start(scope: .application(selection))) {
+      XCTAssertEqual($0 as? HelperError, .invalidState)
+    }
+    session.stop()
+  }
+
+  func testPartialStartFailuresCleanUpAcquiredResourcesInReverseOrder() {
+    let expectations: [(FakePlatform.Operation, [String])] = [
+      (.createTap, ["createTap"]),
+      (.tapUID, ["createTap", "tapUID:11", "destroyTap:11"]),
+      (.tapFormat, ["createTap", "tapUID:11", "tapFormat:11", "destroyTap:11"]),
+      (
+        .outputDevices,
+        ["createTap", "tapUID:11", "tapFormat:11", "outputDevices", "destroyTap:11"]
+      ),
+      (
+        .createAggregate,
+        [
+          "createTap",
+          "tapUID:11",
+          "tapFormat:11",
+          "outputDevices",
+          "createAggregate:tap-uid:output-a,output-b",
+          "destroyTap:11",
+        ]
+      ),
+      (
+        .createIO,
+        [
+          "createTap",
+          "tapUID:11",
+          "tapFormat:11",
+          "outputDevices",
+          "createAggregate:tap-uid:output-a,output-b",
+          "createIO:22",
+          "destroyAggregate:22",
+          "destroyTap:11",
+        ]
+      ),
+      (
+        .startIO,
+        [
+          "createTap",
+          "tapUID:11",
+          "tapFormat:11",
+          "outputDevices",
+          "createAggregate:tap-uid:output-a,output-b",
+          "createIO:22",
+          "startIO:22",
+          "destroyIO:22",
+          "destroyAggregate:22",
+          "destroyTap:11",
+        ]
+      ),
+    ]
+
+    for (operation, expectedOperations) in expectations {
+      let platform = FakePlatform()
+      platform.failingOperation = operation
+      let (session, _, _, _) = makeHarness(platform: platform)
+
+      XCTAssertThrowsError(try session.start())
+      XCTAssertEqual(platform.operations, expectedOperations, operation.rawValue)
+      session.stop()
+      XCTAssertEqual(platform.operations, expectedOperations, operation.rawValue)
+    }
+  }
+
+  func testEmptyUIDMissingDeviceAndUnsupportedFormatUseTypedFailures() {
+    let emptyUID = FakePlatform()
+    emptyUID.uid = ""
+    let (uidSession, _, _, _) = makeHarness(platform: emptyUID)
+    XCTAssertThrowsError(try uidSession.start()) {
+      XCTAssertEqual($0 as? HelperError, .missingTapUID)
+    }
+
+    let missingDevice = FakePlatform()
+    missingDevice.outputDeviceUIDs = []
+    let (deviceSession, _, _, _) = makeHarness(platform: missingDevice)
+    XCTAssertThrowsError(try deviceSession.start()) {
+      XCTAssertEqual($0 as? HelperError, .missingOutputDevice)
+    }
+
+    let invalidFormat = FakePlatform()
+    invalidFormat.format = TapFormat(
+      isLinearPCM: true,
+      isFloat: true,
+      bitsPerChannel: 16,
+      channelsPerFrame: 1,
+      sampleRate: 48_000
+    )
+    let (formatSession, _, _, _) = makeHarness(platform: invalidFormat)
+    XCTAssertThrowsError(try formatSession.start()) {
+      XCTAssertEqual($0 as? HelperError, .unsupportedFormat)
+    }
+  }
+
+  func testDeinitializationCleansAnActiveSession() throws {
+    let platform = FakePlatform()
+    var session: AudioTapSession? = makeHarness(platform: platform).0
+    _ = try session?.start()
+    session = nil
+
+    XCTAssertEqual(
+      Array(platform.operations.suffix(4)),
+      [
+        "stopIO:22",
+        "destroyIO:22",
+        "destroyAggregate:22",
+        "destroyTap:11",
+      ])
+  }
+}
+
+final class HelperEventEncoderTests: XCTestCase {
+  private let encoder = HelperEventEncoder()
+
+  func testStartedEventIsSortedAndNewlineDelimited() throws {
+    XCTAssertEqual(
+      String(
+        decoding: try encoder.encodeLine(
+          .started(sampleRate: 48_000, scope: .diagnosticGlobal)
+        ),
+        as: UTF8.self
+      ),
+      "{\"channels\":1,\"event\":\"started\",\"format\":\"float32le\",\"sampleRate\":48000,\"scope\":{\"kind\":\"diagnostic-global\",\"verified\":false}}\n"
+    )
+  }
+
+  func testStartedApplicationEventContainsOnlyVerifiedSanitizedIdentity() throws {
+    let scope = VerifiedApplicationScope(
+      inventoryGeneration: 7,
+      identity: ResponsibleApplicationIdentity(
+        pid: 2_000,
+        bundleIdentifier: "com.google.Chrome",
+        displayName: "Google Chrome"
+      ),
+      audioProcessObjectIDs: [101, 102],
+      outputDeviceUIDs: ["sony"]
+    )
+
+    XCTAssertEqual(
+      String(
+        decoding: try encoder.encodeLine(
+          .started(sampleRate: 48_000, scope: .application(scope))
+        ),
+        as: UTF8.self
+      ),
+      "{\"channels\":1,\"event\":\"started\",\"format\":\"float32le\",\"sampleRate\":48000,\"scope\":{\"bundleIdentifier\":\"com.google.Chrome\",\"displayName\":\"Google Chrome\",\"inventoryGeneration\":7,\"kind\":\"application\",\"responsiblePid\":2000,\"verified\":true}}\n"
+    )
+  }
+
+  func testStoppedEventContainsOnlyAggregateMetrics() throws {
+    let line = try encoder.encodeLine(
+      .stopped(
+        metrics: SignalSnapshot(callbacks: 2, samples: 4, nonzero: 3, peak: 0.5)
+      )
+    )
+    XCTAssertEqual(
+      String(decoding: line, as: UTF8.self),
+      "{\"event\":\"stopped\",\"metrics\":{\"callbacks\":2,\"nonzero\":3,\"peak\":0.5,\"samples\":4}}\n"
+    )
+  }
+
+  func testErrorEventIsEscapedAndNewlineDelimited() throws {
+    XCTAssertEqual(
+      String(
+        decoding: try encoder.encodeLine(.error(message: "bad \"value\"")),
+        as: UTF8.self
+      ),
+      "{\"event\":\"error\",\"message\":\"bad \\\"value\\\"\"}\n"
+    )
+  }
+
+  func testInventoryEventEncodesAvailableAndUnresolvedSourcesExactly() throws {
+    let inventory = ApplicationCaptureInventory(
+      generation: 42,
+      sources: [
+        ApplicationCaptureSource(
+          identity: ResponsibleApplicationIdentity(
+            pid: 1_000,
+            bundleIdentifier: "com.google.Chrome",
+            displayName: "Google Chrome"
+          ),
+          status: .available,
+          audioProcessObjectIDs: [101, 102],
+          outputDeviceUIDs: ["sony"],
+          requiresBrowserWideAcknowledgement: true
+        ),
+        ApplicationCaptureSource(
+          identity: nil,
+          status: .unresolved(.missingProcessMetadata),
+          audioProcessObjectIDs: [201],
+          outputDeviceUIDs: [],
+          requiresBrowserWideAcknowledgement: false
+        ),
+      ]
+    )
+
+    XCTAssertEqual(
+      String(decoding: try encoder.encodeLine(.inventory(inventory)), as: UTF8.self),
+      "{\"event\":\"inventory\",\"generation\":42,\"sources\":[{\"audioProcessObjectIds\":[101,102],\"failure\":null,\"identity\":{\"bundleIdentifier\":\"com.google.Chrome\",\"displayName\":\"Google Chrome\",\"pid\":1000},\"outputDeviceUids\":[\"sony\"],\"requiresBrowserWideAcknowledgement\":true,\"status\":\"available\"},{\"audioProcessObjectIds\":[201],\"failure\":\"missing-process-metadata\",\"identity\":null,\"outputDeviceUids\":[],\"requiresBrowserWideAcknowledgement\":false,\"status\":\"unresolved\"}]}\n"
+    )
+  }
+
+  func testInventoryEventMapsEveryUnresolvedReason() throws {
+    let failures: [(ApplicationSourceFailure, String)] = [
+      (.cueOwnedAncestry, "cue-owned-ancestry"),
+      (.ancestryCycle, "ancestry-cycle"),
+      (.missingProcessMetadata, "missing-process-metadata"),
+      (.ancestryLimitExceeded, "ancestry-limit-exceeded"),
+      (.missingResponsibleIdentity, "missing-responsible-identity"),
+    ]
+
+    for (failure, expected) in failures {
+      let inventory = ApplicationCaptureInventory(
+        generation: 1,
+        sources: [
+          ApplicationCaptureSource(
+            identity: nil,
+            status: .unresolved(failure),
+            audioProcessObjectIDs: [1],
+            outputDeviceUIDs: [],
+            requiresBrowserWideAcknowledgement: false
+          )
+        ]
+      )
+      XCTAssertTrue(
+        String(decoding: try encoder.encodeLine(.inventory(inventory)), as: UTF8.self)
+          .contains("\"failure\":\"\(expected)\"")
+      )
+    }
+  }
+}
+
+final class HelperRunnerTests: XCTestCase {
+  func testDefaultEncoderProducesTheProductionProtocol() {
+    let session = FakeSession()
+    let termination = FakeTermination()
+    var lines = [String]()
+    let runner = HelperRunner(
+      session: session,
+      termination: termination,
+      writeEvent: { lines.append(String(decoding: $0, as: UTF8.self)) }
+    )
+
+    XCTAssertEqual(runner.run(), 0)
+    XCTAssertEqual(lines.count, 2)
+    XCTAssertTrue(lines[0].contains("\"event\":\"started\""))
+    XCTAssertTrue(lines[1].contains("\"event\":\"stopped\""))
+  }
+
+  func testSuccessWritesStartedThenStoppedAroundTerminationAndCleanup() {
+    let session = FakeSession()
+    let termination = FakeTermination()
+    var events = [HelperEvent]()
+    let runner = HelperRunner(
+      session: session,
+      termination: termination,
+      encode: {
+        events.append($0)
+        return Data([UInt8(events.count)])
+      },
+      writeEvent: { _ in }
+    )
+
+    XCTAssertEqual(runner.run(), 0)
+    XCTAssertEqual(termination.readCount, 1)
+    XCTAssertEqual(termination.waitCount, 1)
+    XCTAssertEqual(session.operations, ["start", "stop", "drain", "snapshot"])
+    XCTAssertEqual(
+      events,
+      [
+        .started(sampleRate: 48_000, scope: .diagnosticGlobal),
+        .stopped(metrics: session.snapshotValue),
+      ])
+  }
+
+  func testApplicationCommandForwardsRequestedAndEffectiveScopeWithoutDowngrade() {
+    let session = FakeSession()
+    let termination = FakeTermination()
+    let selection = ApplicationScopeSelection(
+      inventoryGeneration: 7,
+      responsiblePID: 2_000,
+      bundleIdentifier: "us.zoom.xos",
+      browserWideAcknowledged: false
+    )
+    termination.configuration = .capture(protocolVersion: 1, scope: .application(selection))
+    var events = [HelperEvent]()
+    let runner = HelperRunner(
+      session: session,
+      termination: termination,
+      encode: {
+        events.append($0)
+        return Data([UInt8(events.count)])
+      },
+      writeEvent: { _ in }
+    )
+
+    XCTAssertEqual(runner.run(), 0)
+    XCTAssertEqual(
+      events.first,
+      .started(
+        sampleRate: 48_000,
+        scope: .application(
+          VerifiedApplicationScope(
+            inventoryGeneration: 7,
+            identity: ResponsibleApplicationIdentity(
+              pid: 2_000,
+              bundleIdentifier: "us.zoom.xos",
+              displayName: "Selected app"
+            ),
+            audioProcessObjectIDs: [101],
+            outputDeviceUIDs: ["output-a"]
+          )
+        )
+      )
+    )
+  }
+
+  func testInventoryCommandWritesOneSnapshotWithoutStartingOrWaiting() {
+    let session = FakeSession()
+    let termination = FakeTermination()
+    termination.configuration = .inventory(protocolVersion: 1, generation: 42)
+    let inventory = ApplicationCaptureInventory(generation: 42, sources: [])
+    var requestedGenerations = [UInt64]()
+    var events = [HelperEvent]()
+    let runner = HelperRunner(
+      session: session,
+      termination: termination,
+      inventory: {
+        requestedGenerations.append($0)
+        return inventory
+      },
+      encode: {
+        events.append($0)
+        return Data([1])
+      },
+      writeEvent: { _ in }
+    )
+
+    XCTAssertEqual(runner.run(), 0)
+    XCTAssertEqual(requestedGenerations, [42])
+    XCTAssertEqual(events, [.inventory(inventory)])
+    XCTAssertEqual(termination.readCount, 1)
+    XCTAssertEqual(termination.waitCount, 0)
+    XCTAssertEqual(session.operations, [])
+  }
+
+  func testInventoryFailureUsesTypedErrorWithoutStartingCapture() {
+    let session = FakeSession()
+    let termination = FakeTermination()
+    termination.configuration = .inventory(protocolVersion: 1, generation: 42)
+    var events = [HelperEvent]()
+    let runner = HelperRunner(
+      session: session,
+      termination: termination,
+      inventory: { _ in throw FixtureError.failed("inventory failed") },
+      encode: {
+        events.append($0)
+        return Data([1])
+      },
+      writeEvent: { _ in }
+    )
+
+    XCTAssertEqual(runner.run(), 1)
+    XCTAssertEqual(events, [.error(message: "inventory failed")])
+    XCTAssertEqual(termination.waitCount, 0)
+    XCTAssertEqual(session.operations, ["stop"])
+  }
+
+  func testInventoryCommandRequiresAnInjectedProvider() {
+    let session = FakeSession()
+    let termination = FakeTermination()
+    termination.configuration = .inventory(protocolVersion: 1, generation: 42)
+    var events = [HelperEvent]()
+    let runner = HelperRunner(
+      session: session,
+      termination: termination,
+      encode: {
+        events.append($0)
+        return Data([1])
+      },
+      writeEvent: { _ in }
+    )
+
+    XCTAssertEqual(runner.run(), 1)
+    XCTAssertEqual(events, [.error(message: HelperError.invalidState.description)])
+    XCTAssertEqual(session.operations, ["stop"])
+  }
+
+  func testConfigurationFailurePreventsCaptureAndWritesTypedError() {
+    let session = FakeSession()
+    let termination = FakeTermination()
+    termination.configurationError = FixtureError.failed("configuration failed")
+    var events = [HelperEvent]()
+    let runner = HelperRunner(
+      session: session,
+      termination: termination,
+      encode: {
+        events.append($0)
+        return Data([1])
+      },
+      writeEvent: { _ in }
+    )
+
+    XCTAssertEqual(runner.run(), 1)
+    XCTAssertEqual(termination.readCount, 1)
+    XCTAssertEqual(termination.waitCount, 0)
+    XCTAssertEqual(session.operations, ["stop"])
+    XCTAssertEqual(events, [.error(message: "configuration failed")])
+  }
+
+  func testControlFailureAfterStartCleansUpAndWritesTypedError() {
+    let session = FakeSession()
+    let termination = FakeTermination()
+    termination.waitError = FixtureError.failed("control failed")
+    var events = [HelperEvent]()
+    let runner = HelperRunner(
+      session: session,
+      termination: termination,
+      encode: {
+        events.append($0)
+        return Data([1])
+      },
+      writeEvent: { _ in }
+    )
+
+    XCTAssertEqual(runner.run(), 1)
+    XCTAssertEqual(session.operations, ["start", "stop"])
+    XCTAssertEqual(
+      events,
+      [
+        .started(sampleRate: 48_000, scope: .diagnosticGlobal),
+        .error(message: "control failed"),
+      ]
+    )
+  }
+
+  func testStartFailureStopsAndWritesTypedError() {
+    let session = FakeSession()
+    session.startError = FixtureError.failed("start failed")
+    let termination = FakeTermination()
+    var events = [HelperEvent]()
+    var writes = [Data]()
+    let runner = HelperRunner(
+      session: session,
+      termination: termination,
+      encode: {
+        events.append($0)
+        return Data([7])
+      },
+      writeEvent: { writes.append($0) }
+    )
+
+    XCTAssertEqual(runner.run(), 1)
+    XCTAssertEqual(session.operations, ["start", "stop"])
+    XCTAssertEqual(termination.waitCount, 0)
+    XCTAssertEqual(events, [.error(message: "start failed")])
+    XCTAssertEqual(writes, [Data([7])])
+  }
+
+  func testStartedWriteFailureCleansUpAndBestEffortWritesError() {
+    let session = FakeSession()
+    let termination = FakeTermination()
+    var writeCount = 0
+    var events = [HelperEvent]()
+    let runner = HelperRunner(
+      session: session,
+      termination: termination,
+      encode: {
+        events.append($0)
+        return Data([1])
+      },
+      writeEvent: { _ in
+        writeCount += 1
+        if writeCount == 1 {
+          throw FixtureError.failed("write failed")
+        }
+      }
+    )
+
+    XCTAssertEqual(runner.run(), 1)
+    XCTAssertEqual(session.operations, ["start", "stop"])
+    XCTAssertEqual(
+      events,
+      [
+        .started(sampleRate: 48_000, scope: .diagnosticGlobal),
+        .error(message: "write failed"),
+      ])
+    XCTAssertEqual(writeCount, 2)
+  }
+
+  func testStoppedEncodingFailureUsesErrorPathAfterNormalCleanup() {
+    let session = FakeSession()
+    let termination = FakeTermination()
+    var encodeCount = 0
+    var events = [HelperEvent]()
+    let runner = HelperRunner(
+      session: session,
+      termination: termination,
+      encode: {
+        encodeCount += 1
+        events.append($0)
+        if encodeCount == 2 {
+          throw FixtureError.failed("encode failed")
+        }
+        return Data([1])
+      },
+      writeEvent: { _ in }
+    )
+
+    XCTAssertEqual(runner.run(), 1)
+    XCTAssertEqual(session.operations, ["start", "stop", "drain", "snapshot", "stop"])
+    XCTAssertEqual(
+      events,
+      [
+        .started(sampleRate: 48_000, scope: .diagnosticGlobal),
+        .stopped(metrics: session.snapshotValue),
+        .error(message: "encode failed"),
+      ])
+  }
+
+  func testErrorEncodingAndWritingAreBothBestEffort() {
+    let session = FakeSession()
+    session.startError = FixtureError.failed("start failed")
+    let termination = FakeTermination()
+    let encodingFailure = HelperRunner(
+      session: session,
+      termination: termination,
+      encode: { _ in throw FixtureError.failed("encode failed") },
+      writeEvent: { _ in XCTFail("No event should be written") }
+    )
+    XCTAssertEqual(encodingFailure.run(), 1)
+
+    let secondSession = FakeSession()
+    secondSession.startError = FixtureError.failed("start failed")
+    let writingFailure = HelperRunner(
+      session: secondSession,
+      termination: termination,
+      encode: { _ in Data([1]) },
+      writeEvent: { _ in throw FixtureError.failed("write failed") }
+    )
+    XCTAssertEqual(writingFailure.run(), 1)
+    XCTAssertEqual(secondSession.operations, ["start", "stop"])
+  }
+}

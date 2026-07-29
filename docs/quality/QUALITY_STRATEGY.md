@@ -48,6 +48,47 @@ Excluded by default:
 
 No other exclusion is automatic.
 
+### Swift helper gate
+
+The native CoreAudio helper is project-owned production logic and is not covered by the
+JavaScript/V8 report.
+
+Before `ADR-006` can be treated as release-ready, `TEST-NATIVE-AUDIO-001` must:
+
+1. Extract CoreAudio orchestration, protocol encoding, buffer bounds, and cleanup into testable
+   Swift modules with injected platform operations.
+2. Run Swift tests with coverage instrumentation and enforce 100% line, statement, function, and
+   branch coverage.
+3. If the Swift/LLVM toolchain has no native statement metric, implement a deterministic
+   executable-region equivalent. Reclassifying line coverage as statement coverage without
+   evidence is prohibited.
+4. Mutation-test lifecycle, protocol, bounds, and cleanup logic at a 100% score. If no reliable
+   Swift mutator supports the code, an exact limitation and replacement fault-injection gate
+   require explicit owner approval under the normal exclusion policy.
+5. Keep real CoreAudio/TCC and process-lifecycle acceptance on the target Mac because structural
+   coverage cannot prove platform behavior.
+
+The JavaScript 100% report and the Swift 100% line/function/instantiation/region report must never
+be combined or described as whole-product coverage. Swift/LLVM currently emits no native branch
+records for this package, so branch-equivalent evidence requires the accepted condition mutation
+gate.
+
+The mandatory Swift structural scope is exact and fail-closed:
+
+- `Sources/CueAudioTapCore/CaptureScopeResolver.swift`;
+- `Sources/CueAudioTapCore/HelperCore.swift`;
+- `Sources/CueAudioTapCore/HelperControl.swift`;
+- `Sources/CueAudioTapPlatform/CoreAudioTapPlatform.swift`.
+
+The gate fails if any required file disappears or if a new core/platform production file is not
+classified explicitly. `LiveCoreAudioCalls.swift` and `LiveProcessMetadataCalls.swift` are the
+accepted direct platform boundaries. They contain only CoreAudio property calls, raw C
+callback/pointer marshalling, AppKit process lookup, and libproc parent-PID lookup. Product
+fallback, cue-owned classification, provider, capture-scope, and retention policy remain in the
+instrumented files. The executable `main.swift` is the composition and Darwin signal boundary.
+These direct boundaries require compile/package/signing, packaged E2E, and target-Mac evidence;
+this classification does not convert their live behavior into structurally proven behavior.
+
 ## 4. Mutation policy
 
 Critical modules require a 100% mutation score:
@@ -75,6 +116,9 @@ Equivalent, timeout, and technically unviable mutants must be documented individ
 - Provider request completes after session end.
 - Sleep/wake.
 - Audio route change.
+- macOS default input differs from the meeting-app input.
+- cue explicitly selects a non-default microphone and reports the effective device.
+- requested cue microphone disappears; no silent fallback to another input occurs.
 - Dead stream with active-looking track.
 - Repeated Start/Stop under randomized callback order.
 
@@ -109,11 +153,13 @@ The automated runner should:
 
 1. Start a deterministic local audio fixture.
 2. Start the packaged cue build with permissions already provisioned for the stable signed identity.
-3. Capture microphone and system channels.
-4. Compare received audio fingerprints and timestamps.
-5. Execute repeated Start/Stop cycles.
-6. Verify no frames are accepted after Stop.
-7. Run meeting-application scenarios where automation is technically stable.
+3. Record macOS defaults, meeting-app selections, cue requested input, and cue effective input
+   as independent evidence fields.
+4. Capture microphone and system channels.
+5. Compare received audio fingerprints and timestamps.
+6. Execute repeated Start/Stop cycles.
+7. Verify no frames are accepted after Stop.
+8. Run meeting-application scenarios where automation is technically stable.
 
 Permission dialogs themselves are not a reliable CI target. Permission-denied behavior is tested through injected adapters; the real runner verifies the already-provisioned signed application.
 

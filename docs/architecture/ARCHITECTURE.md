@@ -2,7 +2,10 @@
 
 ## 1. Status
 
-This target architecture is accepted. The Electron audio path must still pass the feasibility spike before its concrete capture adapter is accepted.
+This target architecture is accepted. `ADR-006` selects a signed Swift CoreAudio Process Tap
+helper as the macOS `SystemAudioCapturePort` implementation. Backend selection does not imply
+release readiness; Swift coverage, parent-death cleanup, capture-scope privacy, and the remaining
+target-Mac lifecycle matrix are explicit P0 gates.
 
 ## 2. Architecture drivers
 
@@ -37,19 +40,20 @@ The current monolith should be migrated by vertical slices. A full rewrite is no
 
 ## 4. Component model
 
-| Component                | Responsibility                                                          | Must not own                      |
-| ------------------------ | ----------------------------------------------------------------------- | --------------------------------- |
-| `SessionController`      | Session state machine, generation token, cancellation, lifecycle events | Electron UI, provider SDK details |
-| `MicrophoneCapturePort`  | Local-user PCM stream                                                   | STT selection or transcript state |
-| `SystemAudioCapturePort` | Mixed remote PCM stream and health status                               | Speaker identity or prompts       |
-| `AudioPipeline`          | Format normalization, bounded buffering, VAD, backpressure              | Provider fallback policy          |
-| `RealtimeTranscription`  | Low-latency partial/final text                                          | Long-term speaker identity        |
-| `DiarizationPipeline`    | Stable session-scoped remote speaker labels                             | Microphone speaker classification |
-| `ConversationTimeline`   | Ordered immutable transcript segments and corrections                   | UI rendering                      |
-| `ProviderPolicy`         | Selected provider, consented fallback, attachment rules                 | Provider SDK transport            |
-| `CopilotEngine`          | Meeting, interview, and coding use cases                                | Capture lifecycle                 |
-| `CredentialStore`        | macOS Keychain access                                                   | Renderer-visible secret values    |
-| `TelemetryPort`          | Sanitized local diagnostics and metrics                                 | Raw audio, keys, transcript text  |
+| Component                | Responsibility                                                           | Must not own                             |
+| ------------------------ | ------------------------------------------------------------------------ | ---------------------------------------- |
+| `SessionController`      | Session state machine, generation token, cancellation, lifecycle events  | Electron UI, provider SDK details        |
+| `MicrophoneCapturePort`  | Local-user PCM stream                                                    | STT selection or transcript state        |
+| `AudioDevicePolicy`      | cue input/output selection, default fallback, effective-device reporting | Reading or changing meeting-app settings |
+| `SystemAudioCapturePort` | Mixed remote PCM stream and health status                                | Speaker identity or prompts              |
+| `AudioPipeline`          | Format normalization, bounded buffering, VAD, backpressure               | Provider fallback policy                 |
+| `RealtimeTranscription`  | Low-latency partial/final text                                           | Long-term speaker identity               |
+| `DiarizationPipeline`    | Stable session-scoped remote speaker labels                              | Microphone speaker classification        |
+| `ConversationTimeline`   | Ordered immutable transcript segments and corrections                    | UI rendering                             |
+| `ProviderPolicy`         | Selected provider, consented fallback, attachment rules                  | Provider SDK transport                   |
+| `CopilotEngine`          | Meeting, interview, and coding use cases                                 | Capture lifecycle                        |
+| `CredentialStore`        | macOS Keychain access                                                    | Renderer-visible secret values           |
+| `TelemetryPort`          | Sanitized local diagnostics and metrics                                  | Raw audio, keys, transcript text         |
 
 ## 5. Session state machine
 
@@ -80,24 +84,65 @@ Rules:
 
 ## 6. Audio capture decision
 
-### Preferred path
+### Selected path
 
-Upgrade to a supported Electron version and validate CoreAudio Tap based desktop audio capture on macOS 26.5.2.
+Use a signed Swift CoreAudio Process Tap helper behind `SystemAudioCapturePort`.
 
-### Fallback path
+```text
+CoreAudio Process Tap
+        |
+signed Swift helper
+  CueAudioTapCore: lifecycle/protocol/bounds
+  CueAudioTapPlatform: tested CoreAudio policy
+  LiveCoreAudioCalls: direct Apple API boundary
+  stdout: Float32LE mono PCM
+  stderr: validated JSON lifecycle events
+        |
+Electron main adapter
+  generation gate
+  bounded pre-start buffer
+  16 kHz PCM16 resampling
+        |
+AudioPipeline(system channel)
+```
 
-Introduce a signed Swift helper using ScreenCaptureKit only if the preferred path fails an accepted feasibility criterion.
+Microphone capture remains a separate Electron media path. Meeting Start does not enumerate
+screen sources, and ScreenCaptureKit is not an automatic fallback.
 
-### Decision gate
+The helper uses an injected `CoreAudioCalls` facade. Device discovery, fallback, deduplication,
+aggregate-device policy, OSStatus error contracts, callback gating, and payload validation are
+project policy and remain inside the structurally tested `CoreAudioTapPlatform`. Direct CoreAudio
+property calls, C callback/pointer marshalling, and the executable signal/composition root form the
+explicit live platform boundary. That boundary contains no provider, capture-scope, fallback, or
+retention policy and requires Swift build, package, signing, E2E, and target-Mac evidence.
 
-The capture adapter is accepted only after:
+Production system-audio capture follows the accepted `ADR-007` scope policy:
 
-- Zoom, Teams, and Meet pass;
-- built-in and Bluetooth routes pass;
-- dead-stream detection passes;
-- 100 repeated Start/Stop cycles pass;
-- sleep/wake and route-change behavior is characterized;
-- packaged execution outside the development environment passes.
+- the user explicitly selects one application scope;
+- Chrome means all audible tabs in the selected browser instance and is labeled accordingly;
+- starting browser-wide capture requires explicit acknowledgement;
+- global capture is diagnostic-only and cannot dispatch audio to STT;
+- absent, ambiguous, or stale scope fails closed without a global fallback;
+- exact Chrome tab capture through an extension is deferred.
+
+### Release gate
+
+Architecture selection is complete, but release acceptance additionally requires:
+
+- 100% automated structural coverage for project-owned Swift helper logic;
+- helper termination and CoreAudio cleanup after parent-process death;
+- implemented and tested application-scoped capture that excludes cue playback, discloses
+  browser-wide Chrome scope, and prevents global system audio from reaching STT;
+- available Zoom, Teams, and Meet evidence without inferring one configuration layer from
+  another;
+- built-in, Bluetooth-headset, and USB-microphone/Bluetooth-output route evidence;
+- dead-stream detection and recovery;
+- 100 repeated Start/Stop cycles;
+- sleep/wake, route-change, and disconnect/reconnect characterization;
+- packaged execution outside the development environment.
+
+Microsoft Teams is waived only for the current manual spike because no test conference is
+available. It remains an unverified release requirement.
 
 ## 7. Transcription strategy
 
@@ -146,16 +191,17 @@ Transcript updates are append/correct events. Presentation aliases do not mutate
 
 ## 10. Failure model
 
-| Failure             | Required behavior                                                                |
-| ------------------- | -------------------------------------------------------------------------------- |
-| Permission denied   | Remain non-active and show exact remediation                                     |
-| Dead system stream  | Mark degraded, stop claiming full capture, offer controlled restart              |
-| Device route change | Rebind or transition to degraded according to accepted policy                    |
-| STT timeout         | Preserve buffered segment within bounds; retry only the selected provider policy |
-| LLM timeout         | Keep transcript active; fail only the requested assistance action                |
-| Renderer crash      | Main process closes capture acceptance and tears down adapters                   |
-| App sleep/wake      | Revalidate all streams before returning to active                                |
-| Buffer overflow     | Apply defined drop/backpressure policy and record sanitized diagnostic event     |
+| Failure                         | Required behavior                                                                    |
+| ------------------------------- | ------------------------------------------------------------------------------------ |
+| Permission denied               | Remain non-active and show exact remediation                                         |
+| Dead system stream              | Mark degraded, stop claiming full capture, offer controlled restart                  |
+| Device route change             | Rebind or transition to degraded according to accepted policy                        |
+| Requested cue input unavailable | Do not silently substitute another microphone; require an explicit fallback decision |
+| STT timeout                     | Preserve buffered segment within bounds; retry only the selected provider policy     |
+| LLM timeout                     | Keep transcript active; fail only the requested assistance action                    |
+| Renderer crash                  | Main process closes capture acceptance and tears down adapters                       |
+| App sleep/wake                  | Revalidate all streams before returning to active                                    |
+| Buffer overflow                 | Apply defined drop/backpressure policy and record sanitized diagnostic event         |
 
 ## 11. Security boundaries
 
@@ -170,6 +216,8 @@ Transcript updates are append/correct events. Presentation aliases do not mutate
 
 - Domain and application components accept ports and clocks as dependencies.
 - Time, provider responses, stream callbacks, permissions, and device changes are injectable.
+- Device selection tests inject macOS defaults, cue requests, and effective track metadata as
+  separate inputs. Meeting-app settings are evidence metadata, not an implicit capture API.
 - State transitions produce deterministic events.
 - Audio fixtures are synthetic or explicitly consented and contain no secrets.
 - Platform adapters have contract suites shared by fake, Electron, and possible Swift implementations.
